@@ -208,6 +208,39 @@ export default function MovieCard({ movie, onClick }) {
         .ratings-count.unrated-text {
           color: var(--text-muted);
         }
+
+        /* --- RESPONSIVE MÓVIL OPTIMIZADO (Cyber-Cinematic Glow) --- */
+        @media (max-width: 480px) {
+          .movie-card {
+            border-radius: 18px;
+            padding: 6px;
+          }
+          .movie-title {
+            font-size: 15px;
+            height: auto;
+            max-height: 40px;
+            -webkit-line-clamp: 2;
+            margin-bottom: 4px;
+          }
+          .ratings-count {
+            font-size: 10.5px;
+          }
+          .score-badge {
+            top: 6px;
+            right: 6px;
+            padding: 3px 6px;
+            font-size: 11px;
+            border-radius: 8px;
+          }
+          .overlay-tag {
+            font-size: 8px;
+            padding: 3px 6px;
+            border-radius: 6px;
+          }
+          .poster-wrapper {
+            border-radius: 12px;
+          }
+        }
       `}</style>
     </div>
   );

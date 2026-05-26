@@ -809,6 +809,62 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
           from { opacity: 0; }
           to { opacity: 1; }
         }
+
+        /* --- RESPONSIVE MÓVIL OPTIMIZADO (Cyber-Cinematic Glow) --- */
+        @media (max-width: 480px) {
+          .upcoming-card {
+            flex-direction: column;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(13, 17, 28, 0.55);
+            border-color: rgba(255, 255, 255, 0.05);
+          }
+          .card-poster-wrap {
+            width: 100%;
+            height: 180px;
+            border-radius: 14px;
+          }
+          .card-poster {
+            object-position: center 20%;
+          }
+          .movie-title {
+            font-size: 15px;
+            margin-top: 4px;
+          }
+          .movie-synopsis {
+            font-size: 10.5px;
+            margin-bottom: 10px;
+            -webkit-line-clamp: 3;
+          }
+          .watchlist-actions-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+            padding-top: 8px;
+          }
+          .watchlist-action-col {
+            gap: 2px;
+          }
+          .action-label {
+            font-size: 7px;
+          }
+          .heart-btn, .partner-heart-pill {
+            padding: 8px 12px;
+            font-size: 10.5px;
+            justify-content: center;
+          }
+          .upcoming-header {
+            padding: 12px;
+            gap: 10px;
+            border-radius: 16px;
+          }
+          .header-icon-wrap {
+            font-size: 26px;
+          }
+          .month-chip {
+            padding: 6px 12px;
+            font-size: 10px;
+          }
+        }
       `}</style>
     </div>
   );

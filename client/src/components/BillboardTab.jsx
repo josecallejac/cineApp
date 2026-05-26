@@ -535,6 +535,45 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           box-shadow: 0 4px 12px rgba(255, 42, 95, 0.4);
           backdrop-filter: blur(4px);
         }
+
+        /* --- RESPONSIVE MÓVIL OPTIMIZADO (Cyber-Cinematic Glow) --- */
+        @media (max-width: 480px) {
+          .movies-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px;
+            padding: 4px;
+          }
+          .search-filters-panel {
+            padding: 10px;
+            gap: 8px;
+            border-radius: 16px;
+          }
+          .cinema-chips-row {
+            padding-bottom: 2px;
+          }
+          .cinema-chip-btn {
+            padding: 6px 12px;
+            font-size: 10px;
+          }
+          .filter-select {
+            padding: 8px 12px 8px 30px;
+            font-size: 11px;
+          }
+          .alert-banner {
+            padding: 10px 12px;
+            border-radius: 14px;
+            gap: 8px;
+          }
+          .alert-icon {
+            font-size: 14px;
+          }
+          .alert-title {
+            font-size: 11px;
+          }
+          .alert-sub {
+            font-size: 9px;
+          }
+        }
       `}</style>
     </div>
   );
