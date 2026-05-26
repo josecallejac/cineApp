@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const database = require('./database');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -8,10 +9,9 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Ruta de Bienvenida de CineGlow API
-app.get('/', (req, res) => {
-  res.send('🎬✨ CineGlow API - ¡El motor de tu app de cine está encendido y listo en la nube! 🚀💖');
-});
+// Servir archivos estáticos del cliente (Vite compilado)
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
 
 // Endpoint de Registro de Usuario
 app.post('/api/auth/register', (req, res) => {
@@ -627,6 +627,19 @@ app.get('/api/context', (req, res) => {
   } catch (error) {
     console.error('Error ejecutando el agente de contextos:', error);
     res.status(500).json({ error: 'No se pudo generar el contexto: ' + error.message });
+  }
+});
+
+// Ruta comodín para servir el frontend de React SPA
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  const indexPath = path.join(__dirname, '../client/dist/index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.send('🎬✨ CineGlow API - El motor de tu app de cine está encendido en la nube, pero el frontend aún no se ha compilado. 🚀💖');
   }
 });
 
