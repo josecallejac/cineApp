@@ -204,6 +204,9 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           flex-direction: column;
           gap: 16px;
           height: 100%;
+          width: 100%;
+          max-width: 100%; /* iOS: bloquear expansión horizontal */
+          overflow-x: hidden;
         }
 
         .search-filters-panel {
@@ -391,10 +394,14 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           display: flex;
           gap: 8px;
           overflow-x: auto;
+          overflow-y: hidden; /* evita scroll vertical accidental */
           padding-bottom: 6px;
           margin-top: 6px;
           margin-bottom: 2px;
           scrollbar-width: none;
+          /* iOS: contener el scroll dentro del padre, no expandir el viewport */
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
         }
 
         .cinema-chips-row::-webkit-scrollbar {

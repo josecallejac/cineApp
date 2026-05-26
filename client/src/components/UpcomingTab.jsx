@@ -284,6 +284,9 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
           flex-direction: column;
           gap: 14px;
           height: 100%;
+          width: 100%;
+          max-width: 100%; /* iOS: bloquear expansión horizontal */
+          overflow-x: hidden;
         }
 
         .upcoming-header {
@@ -320,8 +323,11 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
           display: flex;
           gap: 8px;
           overflow-x: auto;
+          overflow-y: hidden;
           scrollbar-width: none;
           padding-bottom: 4px;
+          max-width: 100%; /* iOS: no expandir el viewport */
+          -webkit-overflow-scrolling: touch;
         }
 
         .month-filters::-webkit-scrollbar {

@@ -33,6 +33,13 @@
   --app-max-width: 440px;
 }
 
+/* CRÍTICO iOS Safari: bloquear overflow horizontal en toda la jerarquía
+   para evitar que el viewport se expanda y Safari haga zoom automático */
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -50,7 +57,9 @@ body {
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  overflow-x: hidden; /* iOS Safari: evita zoom por desbordamiento horizontal */
   position: relative;
+  max-width: 100%;
 }
 
 /* Pulsing ambient glowing lights in background */
@@ -96,11 +105,13 @@ body::after {
   background-color: var(--bg-deep);
   position: relative;
   width: 100%;
+  max-width: 100%; /* iOS: evita que el contenedor desborde */
   height: 100vh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overflow-x: hidden; /* bloqueo explícito del eje X */
   box-shadow: 0 0 100px rgba(0, 0, 0, 0.95);
   transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
@@ -157,7 +168,9 @@ body::after {
 .scroll-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* iOS Safari: bloqueo crítico del scroll/zoom horizontal */
   padding: 0 16px 110px 16px;
+  max-width: 100%; /* asegura que nunca exceda el ancho del viewport */
   /* Smooth scroll inertia for mobile iOS */
   -webkit-overflow-scrolling: touch;
 }
