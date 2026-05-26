@@ -1,0 +1,57 @@
+# =========================================================================
+# CineGlow - Git Ignore Configuration
+# =========================================================================
+
+# --- Dependencias (Ignorar node_modules globales y de subproyectos) ---
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# --- Bases de Datos Locales (¡CRÍTICO!) ---
+# Ignoramos db.json para que no se suba a GitHub y no sobrescriba 
+# tu base de datos real del Volumen Persistente en Railway.
+server/db.json
+server/db.test.json
+server/db.json.backup
+
+# --- Caches y Archivos Temporales de Servidor ---
+server/cache/
+server/*.stackdump
+*.stackdump
+response_debug.json
+
+# --- Compilados de Producción del Frontend ---
+# El build se autogenera en Vercel, no es necesario subirlo a GitHub
+client/dist/
+client/dist-ssr/
+
+# --- Variables de Entorno y Credenciales ---
+# Contienen contraseñas, tokens y URLs de producción específicas
+.env
+.env.local
+.env.*.local
+client/.env
+client/.env.local
+client/.env.*.local
+server/.env
+server/.env.local
+
+# --- Logs de Sistema y npm ---
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Configuración de Editores e IDEs ---
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

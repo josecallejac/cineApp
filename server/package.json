@@ -1,0 +1,17 @@
+{
+  "name": "cineglow-server",
+  "version": "1.0.0",
+  "description": "Servidor Express & Proxy API para CineGlow Mobile",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test database.test.js"
+  },
+  "dependencies": {
+    "cineglow-mobile": "file:..",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
