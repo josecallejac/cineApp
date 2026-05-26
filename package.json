@@ -4,6 +4,7 @@
   "description": "CineGlow - Aplicación Móvil Premium de Cartelera y Valoración para Cinépolis Sector Oriente",
   "main": "index.js",
   "scripts": {
+    "start": "node server/server.js",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client",
     "server": "node server/server.js",
     "client": "npm run dev --prefix client",
