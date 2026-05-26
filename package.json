@@ -10,8 +10,7 @@
     "client": "npm run dev --prefix client",
     "dev": "npx concurrently \"npm run server\" \"npm run client\"",
     "context": "node generate-context.js",
-    "postinstall": "npm install --prefix server --no-audit --no-fund && npm install --prefix client --no-audit --no-fund",
-    "build": "npm run build --prefix client"
+    "postinstall": "npm install --prefix server --no-audit --no-fund"
   },
   "dependencies": {
     "concurrently": "^8.2.2"
