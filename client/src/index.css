@@ -62,32 +62,9 @@ body {
   max-width: 100%;
 }
 
-/* Pulsing ambient glowing lights in background */
-body::before, body::after {
-  content: '';
-  position: absolute;
-  width: 450px;
-  height: 450px;
-  border-radius: 50%;
-  filter: blur(140px);
-  opacity: 0.16;
-  z-index: -1;
-  pointer-events: none;
-  animation: pulseAmbient 12s infinite alternate ease-in-out;
-}
-
-body::before {
-  background: var(--accent-rose);
-  top: -100px;
-  left: calc(50% - 350px);
-}
-
-body::after {
-  background: var(--accent-cyan);
-  bottom: -100px;
-  right: calc(50% - 350px);
-  animation-delay: -6s;
-}
+/* Pulsing ambient glowing lights - now on the app wrapper, not body,
+   so overflow:hidden properly clips them and iOS doesn't see them as
+   viewport-expanding content */
 
 @keyframes pulseAmbient {
   0% {
@@ -95,7 +72,7 @@ body::after {
     opacity: 0.12;
   }
   100% {
-    transform: scale(1.15) translate(30px, 30px);
+    transform: scale(1.1) translate(15px, 15px);
     opacity: 0.2;
   }
 }
@@ -105,15 +82,44 @@ body::after {
   background-color: var(--bg-deep);
   position: relative;
   width: 100%;
-  max-width: 100%; /* iOS: evita que el contenedor desborde */
+  max-width: 100%;
   height: 100vh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  overflow-x: hidden; /* bloqueo explícito del eje X */
+  overflow-x: hidden;
   box-shadow: 0 0 100px rgba(0, 0, 0, 0.95);
   transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Luces ambientales dentro del wrapper — ahora sí contenidas por overflow:hidden */
+.mobile-app-wrapper::before,
+.mobile-app-wrapper::after {
+  content: '';
+  position: absolute;
+  width: 60%; /* relativo al wrapper, nunca excede el viewport */
+  max-width: 300px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.18;
+  z-index: 0;
+  pointer-events: none;
+  animation: pulseAmbient 12s infinite alternate ease-in-out;
+}
+
+.mobile-app-wrapper::before {
+  background: var(--accent-rose);
+  top: -80px;
+  left: -60px;
+}
+
+.mobile-app-wrapper::after {
+  background: var(--accent-cyan);
+  bottom: -80px;
+  right: -60px;
+  animation-delay: -6s;
 }
 
 /* Desktop Presentation Mockup Bezel */
