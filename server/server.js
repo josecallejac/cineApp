@@ -8,6 +8,11 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+// Ruta de Bienvenida de CineGlow API
+app.get('/', (req, res) => {
+  res.send('🎬✨ CineGlow API - ¡El motor de tu app de cine está encendido y listo en la nube! 🚀💖');
+});
+
 // Endpoint de Registro de Usuario
 app.post('/api/auth/register', (req, res) => {
   try {
