@@ -97,6 +97,7 @@ body::after {
   position: relative;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -340,3 +341,49 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:f
     background-position: -200% 0;
   }
 }
+
+/* --- CYBER-CINEMATIC GLOW RESPONSIVE GLOBAL MÓVIL (Menores de 480px / iPhone 13 Mini) --- */
+@media (max-width: 480px) {
+  /* Ocultar barra de simulación emoji en celulares reales (evita redundancia con iOS nativo) */
+  .app-status-bar-sim {
+    display: none !important;
+  }
+
+  /* Ajustar la cabecera real para dar más aire y espacio vertical */
+  .app-header {
+    padding: 12px 14px 8px 14px !important;
+  }
+
+  .app-logo {
+    font-size: 20px !important;
+  }
+
+  .app-sub-title {
+    font-size: 8px !important;
+  }
+
+  .app-user-row {
+    padding: 6px 10px !important;
+    gap: 8px !important;
+    border-radius: 14px !important;
+  }
+
+  .header-avatar {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .header-username {
+    font-size: 11px !important;
+  }
+
+  .header-points-badge {
+    font-size: 8.5px !important;
+  }
+
+  /* Ajustar scroll y padding inferior para la barra flotante de pestañas */
+  .scroll-container {
+    padding: 4px 12px 90px 12px !important;
+  }
+}
+
