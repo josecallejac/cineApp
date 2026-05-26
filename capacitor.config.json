@@ -1,0 +1,5 @@
+{
+  "appId": "com.cineglow.app",
+  "appName": "CineGlow",
+  "webDir": "client/dist"
+}

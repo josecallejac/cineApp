@@ -237,10 +237,11 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           border-radius: 14px;
           color: var(--text-primary);
           font-family: var(--font-sans);
-          font-size: 12.5px;
+          font-size: 16px; /* iOS: mínimo 16px para evitar auto-zoom al enfocar */
           padding: 11px 32px 11px 38px;
           outline: none;
           transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+          touch-action: manipulation;
         }
 
         .search-field:focus {
@@ -295,12 +296,13 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           color: var(--text-primary);
           font-family: var(--font-display);
           font-weight: 700;
-          font-size: 11.5px;
+          font-size: 16px; /* iOS: mínimo 16px para evitar auto-zoom al enfocar */
           padding: 10px 12px 10px 30px;
           outline: none;
           cursor: pointer;
           appearance: none;
           transition: all 0.3s;
+          touch-action: manipulation;
         }
 
         .filter-select:focus {
@@ -555,9 +557,11 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
             padding: 6px 12px;
             font-size: 10px;
           }
+          /* CRÍTICO iOS: Mantener font-size >= 16px en inputs/selects para evitar
+             el auto-zoom de Safari en iPhone al hacer focus en el campo */
+          .search-field,
           .filter-select {
-            padding: 8px 12px 8px 30px;
-            font-size: 11px;
+            font-size: 16px !important;
           }
           .alert-banner {
             padding: 10px 12px;

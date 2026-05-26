@@ -276,11 +276,12 @@ input[type="text"], input[type="password"], select, textarea {
   border-radius: 14px;
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 16px; /* iOS Safari: min 16px evita zoom automático al hacer focus */
   padding: 12px 16px;
   outline: none;
   transition: all 0.3s ease;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  touch-action: manipulation;
 }
 
 input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
@@ -385,5 +386,14 @@ input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:f
   .scroll-container {
     padding: 4px 12px 90px 12px !important;
   }
-}
 
+  /* CRÍTICO iOS: Safari hace zoom automático en cualquier input/select con
+     font-size menor a 16px. Forzamos 16px en todos los dispositivos móviles
+     reales para evitar este comportamiento inesperado. */
+  input[type="text"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
