@@ -297,6 +297,10 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
           background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%);
           border: 1px solid rgba(139, 92, 246, 0.15);
           border-radius: 18px;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .header-icon-wrap {
@@ -321,11 +325,13 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
 
         .month-filters {
           display: flex;
+          flex-wrap: nowrap;
           gap: 8px;
           overflow-x: auto;
           overflow-y: hidden;
           scrollbar-width: none;
           padding-bottom: 4px;
+          width: 100%;
           max-width: 100%; /* iOS: no expandir el viewport */
           -webkit-overflow-scrolling: touch;
         }
@@ -335,6 +341,7 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
         }
 
         .month-chip {
+          flex-shrink: 0;
           white-space: nowrap;
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.05);
@@ -361,6 +368,9 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
 
         .upcoming-movies-area {
           flex: 1;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .upcoming-grid {

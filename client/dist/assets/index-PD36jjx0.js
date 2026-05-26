@@ -391,6 +391,10 @@ Error generating stack: `+o.message+`
           gap: 10px;
           flex-shrink: 0;
           box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .search-input-wrap {
@@ -489,6 +493,9 @@ Error generating stack: `+o.message+`
 
         .movies-grid-scroll-area {
           flex: 1;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .movies-grid {
@@ -565,6 +572,7 @@ Error generating stack: `+o.message+`
         /* Estilos de chips de complejo (Recomendación A) */
         .cinema-chips-row {
           display: flex;
+          flex-wrap: nowrap;
           gap: 8px;
           overflow-x: auto;
           overflow-y: hidden; /* evita scroll vertical accidental */
@@ -573,6 +581,7 @@ Error generating stack: `+o.message+`
           margin-bottom: 2px;
           scrollbar-width: none;
           /* iOS: contener el scroll dentro del padre, no expandir el viewport */
+          width: 100%;
           max-width: 100%;
           -webkit-overflow-scrolling: touch;
         }
@@ -582,6 +591,7 @@ Error generating stack: `+o.message+`
         }
 
         .cinema-chip-btn {
+          flex-shrink: 0;
           white-space: nowrap;
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.05);
@@ -4466,6 +4476,10 @@ Error generating stack: `+o.message+`
           background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(6, 182, 212, 0.04) 100%);
           border: 1px solid rgba(139, 92, 246, 0.15);
           border-radius: 18px;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .header-icon-wrap {
@@ -4490,11 +4504,13 @@ Error generating stack: `+o.message+`
 
         .month-filters {
           display: flex;
+          flex-wrap: nowrap;
           gap: 8px;
           overflow-x: auto;
           overflow-y: hidden;
           scrollbar-width: none;
           padding-bottom: 4px;
+          width: 100%;
           max-width: 100%; /* iOS: no expandir el viewport */
           -webkit-overflow-scrolling: touch;
         }
@@ -4504,6 +4520,7 @@ Error generating stack: `+o.message+`
         }
 
         .month-chip {
+          flex-shrink: 0;
           white-space: nowrap;
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.05);
@@ -4530,6 +4547,9 @@ Error generating stack: `+o.message+`
 
         .upcoming-movies-area {
           flex: 1;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .upcoming-grid {

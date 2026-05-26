@@ -218,6 +218,10 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           gap: 10px;
           flex-shrink: 0;
           box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .search-input-wrap {
@@ -316,6 +320,9 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
 
         .movies-grid-scroll-area {
           flex: 1;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .movies-grid {
@@ -392,6 +399,7 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
         /* Estilos de chips de complejo (Recomendación A) */
         .cinema-chips-row {
           display: flex;
+          flex-wrap: nowrap;
           gap: 8px;
           overflow-x: auto;
           overflow-y: hidden; /* evita scroll vertical accidental */
@@ -400,6 +408,7 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           margin-bottom: 2px;
           scrollbar-width: none;
           /* iOS: contener el scroll dentro del padre, no expandir el viewport */
+          width: 100%;
           max-width: 100%;
           -webkit-overflow-scrolling: touch;
         }
@@ -409,6 +418,7 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
         }
 
         .cinema-chip-btn {
+          flex-shrink: 0;
           white-space: nowrap;
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.05);
