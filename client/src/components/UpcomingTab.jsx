@@ -283,10 +283,10 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
           display: flex;
           flex-direction: column;
           gap: 14px;
-          height: 100%;
           width: 100%;
-          max-width: 100%; /* iOS: bloquear expansión horizontal */
+          max-width: 100%;
           overflow-x: hidden;
+          /* Sin height:100% — el scroll-container padre maneja el scroll */
         }
 
         .upcoming-header {

@@ -203,10 +203,10 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           display: flex;
           flex-direction: column;
           gap: 16px;
-          height: 100%;
           width: 100%;
-          max-width: 100%; /* iOS: bloquear expansión horizontal */
+          max-width: 100%;
           overflow-x: hidden;
+          /* Sin height:100% — el scroll-container padre maneja el scroll */
         }
 
         .search-filters-panel {
@@ -319,10 +319,9 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
         }
 
         .movies-grid-scroll-area {
-          flex: 1;
           width: 100%;
           max-width: 100%;
-          overflow: hidden;
+          /* Sin overflow:hidden — el padre ya contiene el desbordamiento */
         }
 
         .movies-grid {

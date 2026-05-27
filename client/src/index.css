@@ -185,10 +185,9 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 14px 100px 14px;
+  /* Padding inferior: 90px tab bar + 12px margen + 12px extra */
+  padding: 0 14px 114px 14px;
   -webkit-overflow-scrolling: touch;
-  /* Crítico: sin esta línea iOS permite scroll "bounceable" que rompe el layout */
-  overscroll-behavior: none;
 }
 
 .scroll-container::-webkit-scrollbar,

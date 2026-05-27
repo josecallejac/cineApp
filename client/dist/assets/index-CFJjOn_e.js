@@ -386,10 +386,10 @@ Error generating stack: `+o.message+`
           display: flex;
           flex-direction: column;
           gap: 16px;
-          height: 100%;
           width: 100%;
-          max-width: 100%; /* iOS: bloquear expansión horizontal */
+          max-width: 100%;
           overflow-x: hidden;
+          /* Sin height:100% — el scroll-container padre maneja el scroll */
         }
 
         .search-filters-panel {
@@ -502,10 +502,9 @@ Error generating stack: `+o.message+`
         }
 
         .movies-grid-scroll-area {
-          flex: 1;
           width: 100%;
           max-width: 100%;
-          overflow: hidden;
+          /* Sin overflow:hidden — el padre ya contiene el desbordamiento */
         }
 
         .movies-grid {
@@ -4458,10 +4457,10 @@ Error generating stack: `+o.message+`
           display: flex;
           flex-direction: column;
           gap: 14px;
-          height: 100%;
           width: 100%;
-          max-width: 100%; /* iOS: bloquear expansión horizontal */
+          max-width: 100%;
           overflow-x: hidden;
+          /* Sin height:100% — el scroll-container padre maneja el scroll */
         }
 
         .upcoming-header {
