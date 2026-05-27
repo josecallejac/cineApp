@@ -513,11 +513,12 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
         /* --- Fila de Corazones de Pareja --- */
         .watchlist-actions-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
           border-top: 1px solid rgba(255, 255, 255, 0.04);
           padding-top: 10px;
           margin-top: auto;
+          width: 100%;
         }
 
         .watchlist-action-col {
@@ -848,9 +849,10 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
             -webkit-line-clamp: 3;
           }
           .watchlist-actions-row {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             gap: 8px;
             padding-top: 8px;
+            width: 100%;
           }
           .heart-btn, .partner-heart-pill {
             padding: 8px 12px;

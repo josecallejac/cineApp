@@ -40,18 +40,31 @@
 /* ====================================================
    BODY — base para todos los entornos
    ==================================================== */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 599px) {
+  html, body {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-overflow-scrolling: auto;
+  }
+}
+
 body {
   background-color: #030406;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 16px;
-  min-height: 100vh;
-  min-height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
-  overflow-x: hidden;
   max-width: 100%;
 }
 
@@ -185,6 +198,8 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  min-width: 0;   /* iOS: evitar que flex ignore desbordes horizontales de los hijos */
+  min-height: 0;
   /* Padding inferior: 90px tab bar + 12px margen + 12px extra */
   padding: 0 14px 114px 14px;
   -webkit-overflow-scrolling: touch;

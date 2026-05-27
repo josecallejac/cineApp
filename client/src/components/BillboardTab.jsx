@@ -326,9 +326,10 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
 
         .movies-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 14px;
           padding-bottom: 28px;
+          width: 100%;
         }
 
         /* Skeleton styling */
@@ -557,8 +558,9 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
         /* --- RESPONSIVE MÓVIL (activa sólo en viewport real < 600px) --- */
         @media (max-width: 599px) {
           .movies-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             gap: 14px;
+            width: 100%;
           }
           .search-filters-panel {
             padding: 10px;

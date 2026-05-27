@@ -509,9 +509,10 @@ Error generating stack: `+o.message+`
 
         .movies-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 14px;
           padding-bottom: 28px;
+          width: 100%;
         }
 
         /* Skeleton styling */
@@ -740,8 +741,9 @@ Error generating stack: `+o.message+`
         /* --- RESPONSIVE MÓVIL (activa sólo en viewport real < 600px) --- */
         @media (max-width: 599px) {
           .movies-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             gap: 14px;
+            width: 100%;
           }
           .search-filters-panel {
             padding: 10px;
@@ -4687,11 +4689,12 @@ Error generating stack: `+o.message+`
         /* --- Fila de Corazones de Pareja --- */
         .watchlist-actions-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
           border-top: 1px solid rgba(255, 255, 255, 0.04);
           padding-top: 10px;
           margin-top: auto;
+          width: 100%;
         }
 
         .watchlist-action-col {
@@ -5022,9 +5025,10 @@ Error generating stack: `+o.message+`
             -webkit-line-clamp: 3;
           }
           .watchlist-actions-row {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             gap: 8px;
             padding-top: 8px;
+            width: 100%;
           }
           .heart-btn, .partner-heart-pill {
             padding: 8px 12px;
@@ -6178,4 +6182,4 @@ Error generating stack: `+o.message+`
             gap: 6px;
             font-size: 10px;
           }
-        `})]})}Yd(document.getElementById("root")).render(a.jsx(j.StrictMode,{children:a.jsx(Vf,{})}));
+        `})]})}if(typeof window<"u"&&window.location.search.includes("debug=true")){const e=document.createElement("script");e.src="https://cdn.jsdelivr.net/npm/eruda",e.onload=()=>{window.eruda&&window.eruda.init({defaults:{displaySize:50,theme:"Dark"}})},document.body.appendChild(e)}Yd(document.getElementById("root")).render(a.jsx(j.StrictMode,{children:a.jsx(Vf,{})}));
