@@ -112,12 +112,10 @@ export default function BottomTabBar({ currentTab, onTabChange, showWatchlist, s
 
       <style jsx="true">{`
         .bottom-tab-bar {
-          position: fixed;
+          position: absolute;
           bottom: 12px;
-          left: 50%;
-          transform: translateX(-50%);
-          /* En escritorio: limitado al ancho del mockup */
-          width: min(416px, calc(100vw - 24px));
+          left: 12px;
+          right: 12px;
           height: 66px;
           background: rgba(13, 17, 28, 0.82);
           backdrop-filter: blur(28px) saturate(180%);
@@ -133,14 +131,10 @@ export default function BottomTabBar({ currentTab, onTabChange, showWatchlist, s
           transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
-        /* En móvil real: ocupa todo el ancho y respeta el home indicator */
+        /* En móvil real: baja la barra para respetar el home indicator de iPhone */
         @media (max-width: 599px) {
           .bottom-tab-bar {
             bottom: max(12px, env(safe-area-inset-bottom, 12px));
-            left: 12px;
-            right: 12px;
-            width: auto;
-            transform: none;
           }
         }
 
