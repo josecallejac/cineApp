@@ -555,12 +555,11 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
           backdrop-filter: blur(4px);
         }
 
-        /* --- RESPONSIVE MÓVIL OPTIMIZADO (Cyber-Cinematic Glow) --- */
-        @media (max-width: 480px) {
+        /* --- RESPONSIVE MÓVIL (activa sólo en viewport real < 600px) --- */
+        @media (max-width: 599px) {
           .movies-grid {
-            grid-template-columns: 1fr !important;
-            gap: 16px;
-            padding: 4px;
+            grid-template-columns: 1fr;
+            gap: 14px;
           }
           .search-filters-panel {
             padding: 10px;
@@ -574,26 +573,13 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
             padding: 6px 12px;
             font-size: 10px;
           }
-          /* CRÍTICO iOS: Mantener font-size >= 16px en inputs/selects para evitar
-             el auto-zoom de Safari en iPhone al hacer focus en el campo */
-          .search-field,
-          .filter-select {
-            font-size: 16px !important;
-          }
           .alert-banner {
             padding: 10px 12px;
             border-radius: 14px;
             gap: 8px;
           }
-          .alert-icon {
-            font-size: 14px;
-          }
-          .alert-title {
-            font-size: 11px;
-          }
-          .alert-sub {
-            font-size: 9px;
-          }
+          .alert-title { font-size: 11px; }
+          .alert-sub   { font-size: 9px; }
         }
       `}</style>
     </div>

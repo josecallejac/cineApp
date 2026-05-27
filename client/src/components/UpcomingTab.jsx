@@ -826,8 +826,8 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
           to { opacity: 1; }
         }
 
-        /* --- RESPONSIVE MÓVIL OPTIMIZADO (Cyber-Cinematic Glow) --- */
-        @media (max-width: 480px) {
+        /* --- RESPONSIVE MÓVIL (activa sólo en viewport real < 600px) --- */
+        @media (max-width: 599px) {
           .upcoming-card {
             flex-direction: column;
             gap: 12px;
@@ -840,13 +840,8 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
             height: 180px;
             border-radius: 14px;
           }
-          .card-poster {
-            object-position: center 20%;
-          }
-          .movie-title {
-            font-size: 15px;
-            margin-top: 4px;
-          }
+          .card-poster { object-position: center 20%; }
+          .movie-title { font-size: 15px; margin-top: 4px; }
           .movie-synopsis {
             font-size: 10.5px;
             margin-bottom: 10px;
@@ -857,29 +852,13 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
             gap: 8px;
             padding-top: 8px;
           }
-          .watchlist-action-col {
-            gap: 2px;
-          }
-          .action-label {
-            font-size: 7px;
-          }
           .heart-btn, .partner-heart-pill {
             padding: 8px 12px;
             font-size: 10.5px;
             justify-content: center;
           }
-          .upcoming-header {
-            padding: 12px;
-            gap: 10px;
-            border-radius: 16px;
-          }
-          .header-icon-wrap {
-            font-size: 26px;
-          }
-          .month-chip {
-            padding: 6px 12px;
-            font-size: 10px;
-          }
+          .upcoming-header { padding: 12px; gap: 10px; border-radius: 16px; }
+          .month-chip { padding: 6px 12px; font-size: 10px; }
         }
       `}</style>
     </div>

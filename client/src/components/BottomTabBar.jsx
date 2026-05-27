@@ -112,23 +112,36 @@ export default function BottomTabBar({ currentTab, onTabChange, showWatchlist, s
 
       <style jsx="true">{`
         .bottom-tab-bar {
-          position: absolute;
+          position: fixed;
           bottom: 12px;
-          left: 12px;
-          right: 12px;
+          left: 50%;
+          transform: translateX(-50%);
+          /* En escritorio: limitado al ancho del mockup */
+          width: min(416px, calc(100vw - 24px));
           height: 66px;
-          background: rgba(13, 17, 28, 0.75);
-          backdrop-filter: blur(24px);
-          -webkit-backdrop-filter: blur(24px);
-          border: 1px solid rgba(255, 42, 95, 0.15);
+          background: rgba(13, 17, 28, 0.82);
+          backdrop-filter: blur(28px) saturate(180%);
+          -webkit-backdrop-filter: blur(28px) saturate(180%);
+          border: 1px solid rgba(255, 42, 95, 0.18);
           border-radius: 24px;
           display: flex;
           justify-content: space-around;
           align-items: center;
           padding: 0 8px;
           box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 42, 95, 0.05);
-          z-index: 100;
+          z-index: 200;
           transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* En móvil real: ocupa todo el ancho y respeta el home indicator */
+        @media (max-width: 599px) {
+          .bottom-tab-bar {
+            bottom: max(12px, env(safe-area-inset-bottom, 12px));
+            left: 12px;
+            right: 12px;
+            width: auto;
+            transform: none;
+          }
         }
 
         .tab-item {
@@ -143,6 +156,9 @@ export default function BottomTabBar({ currentTab, onTabChange, showWatchlist, s
           transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
           position: relative;
           padding-top: 4px;
+          touch-action: manipulation;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .tab-icon {
