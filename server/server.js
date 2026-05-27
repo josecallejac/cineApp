@@ -83,28 +83,6 @@ app.get('/api/billboard', async (req, res) => {
               posterUrl = posterUrl.replace("http://", "https://");
             }
 
-            // Buscar en TMDB si hay una clave de API configurada en el entorno
-            const tmdbApiKey = process.env.TMDB_API_KEY;
-            if (tmdbApiKey) {
-              if (tmdbPosterCache[mKey]) {
-                posterUrl = tmdbPosterCache[mKey];
-              } else {
-                // Resolver de forma asíncrona en segundo plano para no ralentizar la respuesta inicial
-                fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(movie.Title)}&language=es-CL`)
-                  .then(r => r.json())
-                  .then(data => {
-                    if (data.results && data.results.length > 0) {
-                      const match = data.results.find(r => r.poster_path);
-                      if (match) {
-                        tmdbPosterCache[mKey] = `https://image.tmdb.org/t/p/w500${match.poster_path}`;
-                        console.log(`[TMDB] Poster HD cargado en caché para: ${movie.Title}`);
-                      }
-                    }
-                  })
-                  .catch(err => console.error(`[TMDB] Error al buscar poster de ${movie.Title}:`, err));
-              }
-            }
-
             uniqueMovies[mKey] = {
               id: movie.Id,
               title: movie.Title,
@@ -165,6 +143,40 @@ app.get('/api/billboard', async (req, res) => {
         });
       });
     });
+
+    // ⚡ RESOLVEDOR SÍNCRONO SECUENCIAL DE POSTERS HD (TMDB) CON MARGEN DE TIEMPO (PREVIENE ECONNRESET)
+    const tmdbApiKey = process.env.TMDB_API_KEY;
+    if (tmdbApiKey) {
+      const movieKeys = Object.keys(uniqueMovies);
+      console.log(`[TMDB] Verificando y resolviendo posters HD para ${movieKeys.length} películas únicas de forma segura...`);
+      
+      for (const mKey of movieKeys) {
+        const movie = uniqueMovies[mKey];
+        if (tmdbPosterCache[mKey]) {
+          movie.poster = tmdbPosterCache[mKey];
+          continue;
+        }
+
+        try {
+          // Sutil delay de 35ms entre peticiones secuenciales para no saturar sockets y evitar bloqueos por DDoS/rate-limiting
+          await new Promise(resolve => setTimeout(resolve, 35));
+
+          const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(movie.title)}&language=es-CL`);
+          const data = await res.json();
+          if (data.results && data.results.length > 0) {
+            const match = data.results.find(r => r.poster_path);
+            if (match) {
+              const hdPoster = `https://image.tmdb.org/t/p/w500${match.poster_path}`;
+              tmdbPosterCache[mKey] = hdPoster;
+              movie.poster = hdPoster;
+              console.log(`[TMDB] Poster HD resuelto con éxito para: ${movie.title}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[TMDB] Error al buscar poster de ${movie.title} síncronamente:`, err.message);
+        }
+      }
+    }
 
     const moviesArray = Object.values(uniqueMovies);
 
