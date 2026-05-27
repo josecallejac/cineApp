@@ -35,6 +35,9 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
+// Caché en memoria para almacenar los posters en alta resolución de TMDB
+const tmdbPosterCache = {};
+
 // Endpoint para obtener la cartelera consolidada y calificada de Sector Oriente
 app.get('/api/billboard', async (req, res) => {
   try {
@@ -72,6 +75,35 @@ app.get('/api/billboard', async (req, res) => {
             // Mapear con puntuaciones de la base de datos local
             const ratingSummary = database.getMovieRatingSummary(mKey);
 
+            let posterUrl = movie.Poster.startsWith("http") ? movie.Poster : `https://static.cinepolis.com${movie.Poster}`;
+            
+            // Forzar HTTPS para evitar problemas de Mixed Content en iOS y navegadores móviles
+            if (posterUrl.startsWith("http://")) {
+              posterUrl = posterUrl.replace("http://", "https://");
+            }
+
+            // Buscar en TMDB si hay una clave de API configurada en el entorno
+            const tmdbApiKey = process.env.TMDB_API_KEY;
+            if (tmdbApiKey) {
+              if (tmdbPosterCache[mKey]) {
+                posterUrl = tmdbPosterCache[mKey];
+              } else {
+                // Resolver de forma asíncrona en segundo plano para no ralentizar la respuesta inicial
+                fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(movie.Title)}&language=es-CL`)
+                  .then(r => r.json())
+                  .then(data => {
+                    if (data.results && data.results.length > 0) {
+                      const match = data.results.find(r => r.poster_path);
+                      if (match) {
+                        tmdbPosterCache[mKey] = `https://image.tmdb.org/t/p/w500${match.poster_path}`;
+                        console.log(`[TMDB] Poster HD cargado en caché para: ${movie.Title}`);
+                      }
+                    }
+                  })
+                  .catch(err => console.error(`[TMDB] Error al buscar poster de ${movie.Title}:`, err));
+              }
+            }
+
             uniqueMovies[mKey] = {
               id: movie.Id,
               title: movie.Title,
@@ -80,7 +112,7 @@ app.get('/api/billboard', async (req, res) => {
               rating: movie.Rating,
               ratingDescription: movie.RatingDescription,
               runTime: movie.RunTime,
-              poster: movie.Poster.startsWith("http") ? movie.Poster : `https://static.cinepolis.com${movie.Poster}`,
+              poster: posterUrl,
               trailer: movie.Trailer,
               director: movie.Director || "Desconocido",
               gender: movie.Gender || "Cine",
