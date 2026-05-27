@@ -675,6 +675,62 @@ app.get('/api/context', (req, res) => {
   }
 });
 
+// Endpoint de Diagnóstico para comprobar la base de datos en la nube (Volumen Persistente)
+app.get('/api/diagnostics', (req, res) => {
+  try {
+    const dbFilename = process.env.NODE_ENV === 'test' ? 'db.test.json' : 'db.json';
+    const resolvedDbPath = process.env.RAILWAY_VOLUME_PATH 
+      ? path.join(process.env.RAILWAY_VOLUME_PATH, dbFilename)
+      : path.join(__dirname, dbFilename);
+
+    const isCloudVolume = !!process.env.RAILWAY_VOLUME_PATH;
+    
+    // Leer métricas reales de la base de datos local o en volumen
+    let stats = { users: 0, ratings: 0, watchlist: 0, envelopes: 0, appointments: 0, notifications: 0 };
+    try {
+      const fsSync = require('fs');
+      if (fsSync.existsSync(resolvedDbPath)) {
+        const fullDb = JSON.parse(fsSync.readFileSync(resolvedDbPath, 'utf-8'));
+        stats = {
+          users: (fullDb.users || []).length,
+          ratings: (fullDb.ratings || []).length,
+          watchlist: (fullDb.watchlist || []).length,
+          envelopes: (fullDb.envelopes || []).length,
+          appointments: (fullDb.appointments || []).length,
+          notifications: (fullDb.notifications || []).length
+        };
+      }
+    } catch (err) {
+      console.error('Error calculando estadísticas en diagnóstico:', err.message);
+    }
+
+    res.json({
+      status: "ONLINE",
+      timestamp: new Date().toISOString(),
+      database: {
+        connectedToCloudVolume: isCloudVolume,
+        environment: process.env.NODE_ENV || 'production',
+        railwayVolumePath: process.env.RAILWAY_VOLUME_PATH || 'No detectado (Usando almacenamiento efímero local de desarrollo)',
+        resolvedPath: resolvedDbPath,
+        dbFilename: dbFilename,
+        exists: require('fs').existsSync(resolvedDbPath)
+      },
+      apiKeys: {
+        tmdbKeyConfigured: !!process.env.TMDB_API_KEY,
+        port: PORT
+      },
+      metrics: stats,
+      system: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        memoryUsage: process.memoryUsage()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Ruta comodín para servir el frontend de React SPA
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) {
