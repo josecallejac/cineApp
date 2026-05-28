@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
-export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, onRefreshWatchlist }) {
+export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, partnerWatchlist, onRefreshWatchlist, partnerUser }) {
   const [upcomingMovies, setUpcomingMovies] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -151,8 +151,10 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
           <div className="upcoming-grid">
             {filteredMovies.map(movie => {
               // Comprobar likes
-              const myLike = watchlist.find(w => w.userId === activeProfile.id && w.movieKey === movie.key);
-              const partnerLike = watchlist.find(w => w.userId !== activeProfile.id && w.movieKey === movie.key);
+              const myLike = watchlist.find(w => w.movieKey === movie.key);
+              const partnerLike = partnerWatchlist && partnerWatchlist.length > 0
+                ? partnerWatchlist.find(w => w.movieKey === movie.key)
+                : watchlist.find(w => w.userId !== activeProfile.id && w.movieKey === movie.key);
               const isMatch = myLike && partnerLike;
 
               return (
@@ -210,12 +212,12 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, on
                       </div>
 
                       <div className="watchlist-action-col">
-                        <span className="action-label">A tu pareja...</span>
+                        <span className="action-label">{partnerUser ? `A ${partnerUser.username}...` : 'A tu pareja...'}</span>
                         <div className={`partner-heart-pill ${partnerLike ? 'active' : ''}`}>
                           <svg className="heart-svg small-heart" viewBox="0 0 24 24">
                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                           </svg>
-                          <span>{partnerLike ? '¡Le tinca! 💖' : 'Aún no opina'}</span>
+                          <span>{partnerLike ? '¡Le tinca! 💖' : partnerUser ? `${partnerUser.username} aún no opina` : 'Aún no opina'}</span>
                         </div>
                       </div>
                     </div>

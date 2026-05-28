@@ -7,7 +7,7 @@ export default function AuthScreen({ onLoginSuccess }) {
   // Form states
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +27,13 @@ export default function AuthScreen({ onLoginSuccess }) {
       return;
     }
     
-    if (!isLoginTab && !name.trim()) {
-      setErrorMessage('Por favor, ingresa tu nombre.');
+    if (!isLoginTab && !confirmPassword.trim()) {
+      setErrorMessage('Por favor, confirma tu contraseña.');
+      return;
+    }
+
+    if (!isLoginTab && password !== confirmPassword) {
+      setErrorMessage('Las contraseñas no coinciden.');
       return;
     }
 
@@ -36,7 +41,7 @@ export default function AuthScreen({ onLoginSuccess }) {
     const endpoint = isLoginTab ? '/api/auth/login' : '/api/auth/register';
     const payload = isLoginTab 
       ? { username: username.trim(), password: password.trim() }
-      : { username: username.trim(), password: password.trim(), name: name.trim() };
+      : { username: username.trim(), password: password.trim(), name: username.trim() };
 
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -90,6 +95,7 @@ export default function AuthScreen({ onLoginSuccess }) {
             onClick={() => {
               setIsLoginTab(true);
               setErrorMessage('');
+              setConfirmPassword('');
             }}
           >
             Iniciar Sesión
@@ -99,6 +105,7 @@ export default function AuthScreen({ onLoginSuccess }) {
             onClick={() => {
               setIsLoginTab(false);
               setErrorMessage('');
+              setConfirmPassword('');
             }}
           >
             Crear Cuenta
@@ -115,23 +122,6 @@ export default function AuthScreen({ onLoginSuccess }) {
 
         {/* Auth form */}
         <form onSubmit={handleSubmit} className="auth-form">
-          {!isLoginTab && (
-            <div className="form-input-group">
-              <label className="input-label">Nombre Completo</label>
-              <div className="input-field-wrap">
-                <span className="input-icon">👤</span>
-                <input
-                  type="text"
-                  className="auth-input-field"
-                  placeholder="Tu nombre de pantalla"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  maxLength={25}
-                />
-              </div>
-            </div>
-          )}
-
           <div className="form-input-group">
             <label className="input-label">Nombre de Usuario</label>
             <div className="input-field-wrap">
@@ -162,6 +152,23 @@ export default function AuthScreen({ onLoginSuccess }) {
               />
             </div>
           </div>
+
+          {!isLoginTab && (
+            <div className="form-input-group">
+              <label className="input-label">Confirmar Contraseña</label>
+              <div className="input-field-wrap">
+                <span className="input-icon">🔑</span>
+                <input
+                  type="password"
+                  className="auth-input-field"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+          )}
 
           <button 
             type="submit" 

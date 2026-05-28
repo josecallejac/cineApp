@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BottomTabBar from './components/BottomTabBar';
 import BillboardTab from './components/BillboardTab';
-import StatsTab from './components/StatsTab';
+import DuoTab from './components/DuoTab';
 import MyRatingsTab from './components/MyRatingsTab';
 import MovieBottomSheet from './components/MovieBottomSheet';
 import AuthScreen from './components/AuthScreen';
@@ -18,9 +18,13 @@ export default function App() {
   const [movies, setMovies] = useState([]);
   const [ratingsList, setRatingsList] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
+  const [partnerWatchlist, setPartnerWatchlist] = useState([]);
+  const [watchlistMatches, setWatchlistMatches] = useState([]);
+  const [partnerUser, setPartnerUser] = useState(null);
   
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDuoModal, setShowDuoModal] = useState(false);
   
   const [notifications, setNotifications] = useState([]);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
@@ -106,13 +110,22 @@ export default function App() {
     }
   };
 
-  // 4. Cargar la watchlist compartida
+  // 4. Cargar la watchlist compartida (con soporte de pareja y matches de cita)
   const fetchWatchlist = async () => {
+    if (!currentUser) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/watchlist`);
+      const response = await fetch(`${API_BASE_URL}/api/watchlist?userId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
-        setWatchlist(data);
+        if (data.watchlist) {
+          setWatchlist(data.watchlist);
+          setPartnerWatchlist(data.partnerWatchlist || []);
+          setWatchlistMatches(data.matches || []);
+          setPartnerUser(data.partner || null);
+        } else {
+          // Retrocompatibilidad
+          setWatchlist(data);
+        }
       }
     } catch (err) {
       console.error("Error cargando watchlist:", err);
@@ -121,6 +134,7 @@ export default function App() {
 
   // Helper para verificar si hay por lo menos un "Cine-Match" en pareja
   const hasWatchlistMatches = () => {
+    if (watchlistMatches && watchlistMatches.length > 0) return true;
     if (!watchlist || watchlist.length === 0) return false;
     const movieLikes = {};
     watchlist.forEach(item => {
@@ -204,6 +218,61 @@ export default function App() {
     setSelectedMovie(null);
   };
 
+  // Vincular Pareja (Glow Duo)
+  const handleLinkPartner = async (partnerUsername) => {
+    if (!currentUser) return { success: false, error: "Inicia sesión primero" };
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          partnerUsername
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setPartnerUser(data.partner);
+        fetchWatchlist(); // Refrescar para calcular matches
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (e) {
+      console.error("Error vinculando pareja:", e);
+      return { success: false, error: "Error de conexión con el servidor" };
+    }
+  };
+
+  // Desvincular Pareja
+  const handleUnlinkPartner = async () => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/unlink`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: currentUser.id
+        })
+      });
+
+      if (response.ok) {
+        setPartnerUser(null);
+        setPartnerWatchlist([]);
+        setWatchlistMatches([]);
+        setCurrentTab('billboard');
+        fetchWatchlist();
+      }
+    } catch (e) {
+      console.error("Error desvinculando pareja:", e);
+    }
+  };
+
   // Si no hay usuario activo, renderizar la pantalla de Login/Registro
   if (!currentUser) {
     return (
@@ -242,11 +311,30 @@ export default function App() {
         
         {/* Fila de Perfil de Usuario Logueado */}
         <div className="app-user-row animate-scale-in">
-          <img src={currentUser.avatar} alt={currentUser.name} className="header-avatar" />
+          <div className="user-avatars-section" onClick={() => setShowDuoModal(true)}>
+            <div className="header-avatar-ring">
+              <img src={currentUser.avatar} alt={currentUser.name} className="header-avatar" />
+            </div>
+            
+            {partnerUser ? (
+              <div className="header-avatar-ring partner animate-scale-in">
+                <img src={partnerUser.avatar} alt={partnerUser.name} className="header-avatar partner-avatar" />
+                <span className="heart-badge-mini">❤️</span>
+              </div>
+            ) : (
+              <div className="header-avatar-ring add-partner" title="Vincular Pareja">
+                <span className="plus-sign">➕</span>
+              </div>
+            )}
+          </div>
           
           <div className="username-header-details">
             <span className="header-username">{currentUser.name}</span>
-            <span className="header-points-badge">✨ Nivel {currentUser.level || 1}</span>
+            {partnerUser ? (
+              <span className="header-points-badge partner-name">💑 Con {partnerUser.name}</span>
+            ) : (
+              <span className="header-points-badge">✨ Nivel {currentUser.level || 1}</span>
+            )}
           </div>
           
           {/* Botón Campana de Notificaciones de Pareja */}
@@ -335,6 +423,8 @@ export default function App() {
             ratingsList={ratingsList}
             movies={movies}
             onMovieClick={setSelectedMovie}
+            currentUser={currentUser}
+            partnerUser={partnerUser}
           />
         )}
 
@@ -343,7 +433,9 @@ export default function App() {
             activeProfile={currentUser}
             onMovieClick={setSelectedMovie}
             watchlist={watchlist}
+            partnerWatchlist={partnerWatchlist}
             onRefreshWatchlist={fetchWatchlist}
+            partnerUser={partnerUser}
           />
         )}
 
@@ -352,13 +444,18 @@ export default function App() {
             activeProfile={currentUser}
             onMovieClick={setSelectedMovie}
             watchlist={watchlist}
+            partnerWatchlist={partnerWatchlist}
             onRefreshWatchlist={fetchWatchlist}
+            partnerUser={partnerUser}
           />
         )}
 
-        {currentTab === 'stats' && (
-          <StatsTab 
-            movies={movies}
+        {currentTab === 'duo' && currentUser && partnerUser && (
+          <DuoTab
+            currentUser={currentUser}
+            partnerUser={partnerUser}
+            ratingsList={ratingsList}
+            onUnlink={handleUnlinkPartner}
           />
         )}
 
@@ -375,6 +472,7 @@ export default function App() {
           <MemoryGalleryTab
             ratingsList={ratingsList}
             activeProfile={currentUser}
+            partnerUser={partnerUser}
           />
         )}
       </main>
@@ -395,11 +493,109 @@ export default function App() {
         currentTab={currentTab}
         onTabChange={setCurrentTab}
         showWatchlist={hasWatchlistMatches()}
-        showMemories={hasMemories()}
+        showMemories={hasMemories() && !partnerUser}
+        showDuo={!!partnerUser}
         billboardAlertCount={billboardAlerts.length}
       />
 
+      {/* Modal CineGlow Duo de Vinculación de Pareja */}
+      {showDuoModal && (
+        <div className="duo-modal-overlay" onClick={() => setShowDuoModal(false)}>
+          <div className="duo-modal-content glass-card animate-scale-in" onClick={e => e.stopPropagation()}>
+            <button className="duo-modal-close" onClick={() => setShowDuoModal(false)}>✕</button>
+            
+            <div className="duo-modal-header">
+              <span className="duo-emoji">💑</span>
+              <h2>CineGlow <span>Duo</span></h2>
+              <p>Vincula tu cuenta con la de tu novia para activar la magia interactiva en pareja</p>
+            </div>
+
+            {partnerUser ? (
+              <div className="duo-active-status animate-scale-in">
+                <div className="duo-hearts-wrap">
+                  <div className="avatar-glow-ring">
+                    <img src={currentUser.avatar} alt={currentUser.name} className="duo-avatar" />
+                  </div>
+                  <span className="neon-heart-connector">❤️</span>
+                  <div className="avatar-glow-ring active">
+                    <img src={partnerUser.avatar} alt={partnerUser.name} className="duo-avatar" />
+                  </div>
+                </div>
+                
+                <div className="duo-linked-info">
+                  <h3>¡Vínculo 100% Activo!</h3>
+                  <p>Estás enlazado con <strong>{partnerUser.name}</strong> (@{partnerUser.username})</p>
+                  <span className="glow-badge">Modo Pareja Sincronizado ✨</span>
+                </div>
+
+                <div className="duo-features-checklist">
+                  <div className="checklist-item">✓ Watchlist compartida y cruce de Matches</div>
+                  <div className="checklist-item">✓ Creación de tickets digitales de cita conjunta</div>
+                  <div className="checklist-item">✓ Notificaciones en vivo de sobres sorpresa</div>
+                </div>
+
+                <button className="btn-unlink" onClick={() => {
+                  if(window.confirm("¿Seguro que deseas desvincular a tu pareja? Los matches se desactivarán.")) {
+                    handleUnlinkPartner();
+                    setShowDuoModal(false);
+                  }
+                }}>
+                  Desvincular Pareja
+                </button>
+              </div>
+            ) : (
+              <DuoLinkForm onLink={handleLinkPartner} onClose={() => setShowDuoModal(false)} />
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
+  );
+}
+
+function DuoLinkForm({ onLink, onClose }) {
+  const [partnerUsername, setPartnerUsername] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    const result = await onLink(partnerUsername);
+    setIsLoading(false);
+
+    if (result.success) {
+      onClose();
+    } else {
+      setError(result.error || "Ocurrió un error");
+    }
+  };
+
+  return (
+    <form className="duo-link-form animate-fade-in" onSubmit={handleSubmit}>
+      <div className="input-wrap">
+        <label>Nombre de usuario de tu pareja</label>
+        <input 
+          type="text" 
+          placeholder="Escribe su usuario (ej: critico)" 
+          value={partnerUsername}
+          onChange={e => setPartnerUsername(e.target.value)}
+          required
+          autoFocus
+        />
+      </div>
+
+      {error && <div className="duo-error-msg animate-shake">⚠️ {error}</div>}
+
+      <div className="duo-form-actions">
+        <button type="button" className="btn-cancel" onClick={onClose}>Cancelar</button>
+        <button type="submit" className="btn-glow btn-glow-cyan" disabled={isLoading}>
+          {isLoading ? 'Vinculando...' : 'Vincular en la Nube 💑'}
+        </button>
+      </div>
+    </form>
   );
 }

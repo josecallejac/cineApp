@@ -1,8 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import RatingStars from './RatingStars';
+import { API_BASE_URL } from '../config';
 
 export default function SocialTab({ ratingsList, movies, onMovieClick }) {
   const [likesState, setLikesState] = useState({}); // { reviewId: { count: number, liked: boolean } }
+  const [stats, setStats] = useState(null);
+  const [showGlobalStats, setShowGlobalStats] = useState(false);
+
+  const fetchGlobalStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/stats`);
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error("Error al cargar estadísticas:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchGlobalStats();
+  }, [ratingsList]);
 
   // Inicializar likes ficticios deterministas
   useEffect(() => {
@@ -46,13 +65,92 @@ export default function SocialTab({ ratingsList, movies, onMovieClick }) {
   return (
     <div className="social-tab-container animate-scale-in">
       
-      {/* Comunidad Intro Card */}
-      <div className="social-intro-card glass-card">
-        <div className="intro-glow-circle">🗣️</div>
-        <div className="intro-text-wrap">
-          <h3>Opiniones de Santiago Oriente</h3>
-          <p>Mira lo que los críticos de la zona dicen sobre los últimos estrenos en Cinépolis. ¡Únete a la conversación!</p>
+      {/* 📊 ACCORDION DE ESTADÍSTICAS GLOBALES */}
+      <div className="global-stats-accordion glass-card">
+        <div 
+          className="accordion-header" 
+          onClick={() => setShowGlobalStats(!showGlobalStats)}
+        >
+          <div className="accordion-title-wrap">
+            <span className="accordion-icon">📊</span>
+            <div>
+              <h4>Análisis y Estadísticas</h4>
+              <p>Métricas generales y películas más populares del club</p>
+            </div>
+          </div>
+          <span className={`accordion-chevron ${showGlobalStats ? 'expanded' : ''}`}>
+            ▼
+          </span>
         </div>
+
+        {showGlobalStats && stats && (
+          <div className="accordion-body animate-fade-in">
+            {/* Grid of quick stats cards */}
+            <div className="stats-quick-grid">
+              <div className="stat-quick-item">
+                <span className="item-emoji">🍿</span>
+                <span className="item-val">{stats.totalMovies}</span>
+                <span className="item-lbl">Películas</span>
+              </div>
+              <div className="stat-quick-item">
+                <span className="item-emoji">⭐</span>
+                <span className="item-val">{stats.totalRatings > 0 ? stats.averageRating : '—'}</span>
+                <span className="item-lbl">Puntaje Medio</span>
+              </div>
+              <div className="stat-quick-item">
+                <span className="item-emoji">✍️</span>
+                <span className="item-val">{stats.totalRatings}</span>
+                <span className="item-lbl">Reseñas</span>
+              </div>
+            </div>
+
+            {/* Best Rated Movie Highlight */}
+            {stats.bestMovie ? (
+              <div className="best-movie-highlight gold-border" onClick={() => handleReviewClick(stats.bestMovie.key)}>
+                <span className="highlight-tag">🏆 MEJOR VALORADA</span>
+                <h5>{stats.bestMovie.title}</h5>
+                <div className="highlight-score-wrap">
+                  <span className="star-char">★</span>
+                  <strong>{stats.bestMovie.average}</strong>
+                  <span className="votes-lbl">({stats.bestMovie.count} {stats.bestMovie.count === 1 ? 'opinión' : 'opiniones'})</span>
+                </div>
+              </div>
+            ) : (
+              <div className="best-movie-highlight">
+                <p className="no-votes-lbl">Aún no hay suficientes calificaciones para calcular la película líder.</p>
+              </div>
+            )}
+
+            {/* Stars Distribution Chart */}
+            {stats.totalRatings > 0 && (
+              <div className="stars-distribution-box">
+                <h6>Distribución de Calificaciones</h6>
+                <div className="dist-list">
+                  {[5, 4, 3, 2, 1].map(stars => {
+                    const count = stats.globalStars[stars] || 0;
+                    const percentage = stats.totalRatings > 0 ? (count / stats.totalRatings) * 100 : 0;
+                    return (
+                      <div key={stars} className="dist-row">
+                        <span className="dist-stars-lbl">{stars} ★</span>
+                        <div className="dist-bar-bg">
+                          <div className="dist-bar-fill" style={{ width: `${percentage}%` }} />
+                        </div>
+                        <span className="dist-count-lbl">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Título divisor de feed */}
+      <div className="social-section-divider">
+        <div className="divider-line" />
+        <span className="divider-title-text">Opiniones de Santiago Oriente</span>
+        <div className="divider-line" />
       </div>
 
       {/* Feed list */}
@@ -494,6 +592,261 @@ export default function SocialTab({ ratingsList, movies, onMovieClick }) {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        /* Collapsible Stats Accordion */
+        .global-stats-accordion {
+          border-color: rgba(6, 182, 212, 0.18);
+          background: rgba(6, 182, 212, 0.02);
+          border-radius: 18px;
+          overflow: hidden;
+          transition: all 0.25s ease;
+        }
+
+        .accordion-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .accordion-header:hover {
+          background: rgba(255, 255, 255, 0.01);
+        }
+
+        .accordion-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .accordion-icon {
+          font-size: 24px;
+          background: rgba(6, 182, 212, 0.1);
+          border: 1px solid rgba(6, 182, 212, 0.25);
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .accordion-title-wrap h4 {
+          font-family: var(--font-display);
+          font-size: 13px;
+          font-weight: 800;
+          color: var(--text-primary);
+          margin: 0;
+        }
+
+        .accordion-title-wrap p {
+          font-size: 9.5px;
+          color: var(--text-secondary);
+          margin: 1px 0 0 0;
+        }
+
+        .accordion-chevron {
+          font-size: 10px;
+          color: var(--text-muted);
+          transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .accordion-chevron.expanded {
+          transform: rotate(180deg);
+        }
+
+        .accordion-body {
+          padding: 16px;
+          border-top: 1px solid rgba(255, 255, 255, 0.04);
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          background: rgba(0, 0, 0, 0.15);
+        }
+
+        /* Stats Grid */
+        .stats-quick-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+
+        .stat-quick-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 6px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.04);
+          text-align: center;
+        }
+
+        .item-emoji {
+          font-size: 16px;
+          margin-bottom: 2px;
+        }
+
+        .item-val {
+          font-family: var(--font-display);
+          font-size: 16px;
+          font-weight: 800;
+          color: var(--text-primary);
+          line-height: 1.1;
+        }
+
+        .item-lbl {
+          font-size: 8px;
+          font-weight: 700;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.2px;
+          margin-top: 2px;
+        }
+
+        /* Best Rated Movie */
+        .best-movie-highlight {
+          display: flex;
+          flex-direction: column;
+          padding: 12px;
+          border-radius: 14px;
+          background: rgba(251, 191, 36, 0.04);
+          border: 1px solid rgba(251, 191, 36, 0.15);
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .best-movie-highlight:hover {
+          background: rgba(251, 191, 36, 0.07);
+          border-color: rgba(251, 191, 36, 0.25);
+        }
+
+        .best-movie-highlight.gold-border {
+          border-color: rgba(251, 191, 36, 0.35);
+          box-shadow: 0 0 10px rgba(251, 191, 36, 0.05);
+        }
+
+        .highlight-tag {
+          font-family: var(--font-display);
+          font-size: 7.5px;
+          font-weight: 800;
+          color: var(--accent-gold);
+          letter-spacing: 0.5px;
+          margin-bottom: 3px;
+        }
+
+        .best-movie-highlight h5 {
+          font-family: var(--font-display);
+          font-size: 12px;
+          font-weight: 850;
+          color: var(--text-primary);
+          margin: 0 0 3px 0;
+          line-height: 1.2;
+        }
+
+        .highlight-score-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          font-size: 11px;
+        }
+
+        .star-char {
+          color: var(--accent-gold);
+        }
+
+        .votes-lbl {
+          font-size: 9px;
+          color: var(--text-muted);
+        }
+
+        .no-votes-lbl {
+          font-size: 10px;
+          color: var(--text-muted);
+          margin: 0;
+        }
+
+        /* Distribution Box */
+        .stars-distribution-box {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .stars-distribution-box h6 {
+          font-family: var(--font-display);
+          font-size: 10.5px;
+          font-weight: 700;
+          color: var(--text-secondary);
+          margin: 0 0 2px 0;
+        }
+
+        .dist-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .dist-stars-lbl {
+          font-family: var(--font-display);
+          font-size: 9.5px;
+          font-weight: 700;
+          color: var(--text-secondary);
+          width: 24px;
+          text-align: right;
+        }
+
+        .dist-bar-bg {
+          flex: 1;
+          height: 6px;
+          background: rgba(255, 255, 255, 0.03);
+          border-radius: 3px;
+          overflow: hidden;
+          position: relative;
+        }
+
+        .dist-bar-fill {
+          height: 100%;
+          border-radius: 3px;
+          background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+          box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+        }
+
+        .dist-count-lbl {
+          font-size: 9px;
+          font-weight: 600;
+          color: var(--text-muted);
+          width: 14px;
+        }
+
+        /* Secciones y dividers */
+        .social-section-divider {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin: 14px 0 4px 0;
+          animation: fadeInUp 0.4s ease;
+        }
+
+        .social-section-divider .divider-line {
+          flex: 1;
+          height: 1px;
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .divider-title-text {
+          font-family: var(--font-display);
+          font-size: 9px;
+          font-weight: 800;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
       `}</style>
     </div>

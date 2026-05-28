@@ -217,4 +217,47 @@ test.describe('CineGlow Database Unit Tests', () => {
       assert.strictEqual(found.isUsed, true);
     });
   });
+
+  test.describe('Vínculo de Pareja (Duo / Linking)', () => {
+    test('Debería vincular dos usuarios exitosamente y desvincularlos', () => {
+      // Registrar un usuario extra para prueba de vínculo (username, password, name)
+      database.registerUser('noviapruebas', 'password123', 'Novia de Pruebas');
+
+      // Obtener el usuario registrado previamente en los tests de auth
+      const user = database.loginUser('testuser', 'pass123');
+      
+      // Vincular testuser con noviapruebas
+      const linkResult = database.linkUsers(user.id, 'noviapruebas');
+      assert.strictEqual(linkResult.success, true);
+      assert.ok(linkResult.partner);
+      assert.strictEqual(linkResult.partner.username, 'noviapruebas');
+
+      // Verificar que getPartner retorne a noviapruebas para testuser
+      const partner = database.getPartner(user.id);
+      assert.ok(partner);
+      assert.strictEqual(partner.username, 'noviapruebas');
+
+      // Desvincular
+      const unlinkResult = database.unlinkUsers(user.id);
+      assert.strictEqual(unlinkResult.success, true);
+
+      // Verificar que getPartner retorne null
+      const partnerAfter = database.getPartner(user.id);
+      assert.strictEqual(partnerAfter, null);
+    });
+
+    test('Debería fallar si intenta vincularse consigo mismo o con usuario inexistente', () => {
+      const user = database.loginUser('testuser', 'pass123');
+      
+      // Intentar vincularse consigo mismo
+      assert.throws(() => {
+        database.linkUsers(user.id, 'testuser');
+      }, /No puedes vincularte contigo mismo/);
+
+      // Intentar vincularse con inexistente
+      assert.throws(() => {
+        database.linkUsers(user.id, 'usuario_fantasma_999');
+      }, /El usuario "usuario_fantasma_999" no existe/);
+    });
+  });
 });

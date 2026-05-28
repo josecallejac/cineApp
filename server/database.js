@@ -322,9 +322,16 @@ function toggleWatchlist(userId, movieKey) {
 
   saveDb(db);
 
-  // Comprobar si se convirtió en un Match de pareja (los 2 usuarios activos le dieron like)
-  const likesCount = db.watchlist.filter(w => w.movieKey === movieKey).length;
-  const hasMatch = likesCount >= 2;
+  // Comprobar si se convirtió en un Match de pareja (si su pareja vinculada también le dio like)
+  let hasMatch = false;
+  const user = db.users.find(u => u.id === userId);
+  if (user && user.partnerId) {
+    hasMatch = db.watchlist.some(w => w.userId === user.partnerId && w.movieKey === movieKey) && isLiked;
+  } else {
+    // Si no está vinculado, usar el comportamiento anterior (cualquier otro like)
+    const otherLikes = db.watchlist.filter(w => w.userId !== userId && w.movieKey === movieKey).length;
+    hasMatch = otherLikes >= 1 && isLiked;
+  }
 
   return { isLiked, hasMatch };
 }
@@ -466,6 +473,82 @@ function markNotificationsAsRead(userId) {
   return { success: true };
 }
 
+// Vincular dos usuarios (Duo de Pareja)
+function linkUsers(userId, partnerUsername) {
+  const db = loadDb();
+  
+  const user = db.users.find(u => u.id === userId);
+  if (!user) {
+    throw new Error("Usuario actual no encontrado.");
+  }
+
+  if (!partnerUsername || !partnerUsername.trim()) {
+    throw new Error("El nombre de usuario de la pareja es obligatorio.");
+  }
+
+  const cleanPartnerName = partnerUsername.trim().toLowerCase();
+  
+  if (user.username === cleanPartnerName) {
+    throw new Error("No puedes vincularte contigo mismo.");
+  }
+
+  const partner = db.users.find(u => u.username === cleanPartnerName);
+  if (!partner) {
+    throw new Error(`El usuario "${partnerUsername}" no existe. Pídele que se registre primero.`);
+  }
+
+  // Vincular perfiles mutuamente
+  user.partnerId = partner.id;
+  partner.partnerId = user.id;
+
+  saveDb(db);
+
+  return {
+    success: true,
+    partner: {
+      id: partner.id,
+      name: partner.name,
+      username: partner.username,
+      avatar: partner.avatar
+    }
+  };
+}
+
+// Obtener datos de la pareja vinculada
+function getPartner(userId) {
+  const db = loadDb();
+  const user = db.users.find(u => u.id === userId);
+  if (!user || !user.partnerId) return null;
+  
+  const partner = db.users.find(u => u.id === user.partnerId);
+  if (!partner) return null;
+
+  return {
+    id: partner.id,
+    name: partner.name,
+    username: partner.username,
+    avatar: partner.avatar
+  };
+}
+
+// Desvincular pareja
+function unlinkUsers(userId) {
+  const db = loadDb();
+  const user = db.users.find(u => u.id === userId);
+  if (!user) return { success: false };
+
+  if (user.partnerId) {
+    const partner = db.users.find(u => u.id === user.partnerId);
+    if (partner) {
+      delete partner.partnerId;
+    }
+    delete user.partnerId;
+  }
+  
+  saveDb(db);
+  return { success: true };
+}
+
 module.exports = {
   registerUser,
   loginUser,
@@ -484,7 +567,10 @@ module.exports = {
   deleteAppointment,
   createNotification,
   getUserNotifications,
-  markNotificationsAsRead
+  markNotificationsAsRead,
+  linkUsers,
+  getPartner,
+  unlinkUsers
 };
 
 // Inicializar la base de datos inmediatamente al importar el módulo

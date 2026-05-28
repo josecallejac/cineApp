@@ -362,7 +362,7 @@ const UPCOMING_MOVIES = [
     originalTitle: "Toy Story 5",
     releaseDate: "2026-06-19",
     genres: ["Animación", "Aventura", "Familia"],
-    poster: "https://image.tmdb.org/t/p/w500/uXDfjJbdP4ijWcKTSArYi1Jt9S5.jpg",
+    poster: "https://image.tmdb.org/t/p/w500/1h9E37wO86XJ2C6C3p6aR1oO0oM.jpg",
     synopsis: "Woody, Buzz y la pandilla regresan para una nueva aventura donde los juguetes tradicionales tendrán que competir cara a cara con las nuevas tecnologías y pantallas.",
     distributor: "Walt Disney Studios",
     director: "Andrew Stanton",
@@ -374,7 +374,7 @@ const UPCOMING_MOVIES = [
     originalTitle: "The Batman Part II",
     releaseDate: "2026-10-02",
     genres: ["Acción", "Crimen", "Drama"],
-    poster: "https://image.tmdb.org/t/p/w500/74xTEgt7RHUei5PGB3L2T9IpI5P.jpg",
+    poster: "/batman_2_poster.png",
     synopsis: "Robert Pattinson regresa como el Caballero de la Noche en esta secuela directa de la aclamada obra policial de Matt Reeves en una Gotham sumida en el caos.",
     distributor: "Warner Bros. Pictures",
     director: "Matt Reeves",
@@ -398,7 +398,7 @@ const UPCOMING_MOVIES = [
     originalTitle: "Shrek 5",
     releaseDate: "2026-07-01",
     genres: ["Animación", "Comedia", "Fantasía"],
-    poster: "https://image.tmdb.org/t/p/w500/140ewbWv8qHStD3mlBDvvGd0Zvu.jpg",
+    poster: "/shrek_5_poster.png",
     synopsis: "¡El ogro más famoso del cine regresa! Mike Myers, Eddie Murphy y Cameron Diaz vuelven en la esperada quinta entrega para recordarnos por qué el pantano es sagrado.",
     distributor: "Universal Pictures",
     director: "Walt Dohrn",
@@ -429,11 +429,38 @@ app.get('/api/upcoming', (req, res) => {
   }
 });
 
-// Obtener likes de la watchlist
+// Obtener likes de la watchlist (con soporte inteligente de Duo de pareja)
 app.get('/api/watchlist', (req, res) => {
   try {
+    const { userId } = req.query;
     const list = database.getWatchlist();
-    res.json(list);
+
+    if (!userId) {
+      return res.json(list);
+    }
+
+    // Filtrar la watchlist del usuario
+    const myWatchlist = list.filter(w => w.userId === userId);
+    
+    // Obtener la pareja si existe
+    const partner = database.getPartner(userId);
+    let partnerWatchlist = [];
+    let matches = [];
+
+    if (partner) {
+      partnerWatchlist = list.filter(w => w.userId === partner.id);
+      
+      // Encontrar las películas que a ambos les gustan
+      const myKeys = new Set(myWatchlist.map(w => w.movieKey));
+      matches = partnerWatchlist.filter(w => myKeys.has(w.movieKey));
+    }
+
+    res.json({
+      watchlist: myWatchlist,
+      partnerWatchlist,
+      matches,
+      partner
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -451,6 +478,47 @@ app.post('/api/watchlist/toggle', (req, res) => {
   } catch (error) {
     const message = error ? error.message : "Error desconocido";
     res.status(400).json({ error: message });
+  }
+});
+
+// --- ENDPOINTS VINCULACIÓN PAREJA (GLOW DUO) ---
+
+// Vincular dos usuarios (Pareja)
+app.post('/api/users/link', (req, res) => {
+  try {
+    const { userId, partnerUsername } = req.body;
+    if (!userId || !partnerUsername) {
+      return res.status(400).json({ error: "userId y partnerUsername son requeridos." });
+    }
+    const result = database.linkUsers(userId, partnerUsername);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Obtener datos de la pareja de un usuario
+app.get('/api/users/partner/:userId', (req, res) => {
+  try {
+    const { userId } = req.params;
+    const partner = database.getPartner(userId);
+    res.json({ partner });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Desvincular pareja
+app.post('/api/users/unlink', (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: "userId es requerido." });
+    }
+    const result = database.unlinkUsers(userId);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
-export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, onRefreshWatchlist }) {
+export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, partnerWatchlist, onRefreshWatchlist, partnerUser }) {
   const [upcomingMovies, setUpcomingMovies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -55,8 +55,10 @@ export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, o
 
   if (!isLoading) {
     upcomingMovies.forEach(movie => {
-      const myLike = watchlist.find(w => w.userId === activeProfile.id && w.movieKey === movie.key);
-      const partnerLike = watchlist.find(w => w.userId !== activeProfile.id && w.movieKey === movie.key);
+      const myLike = watchlist.find(w => w.movieKey === movie.key);
+      const partnerLike = partnerWatchlist && partnerWatchlist.length > 0
+        ? partnerWatchlist.find(w => w.movieKey === movie.key)
+        : watchlist.find(w => w.userId !== activeProfile.id && w.movieKey === movie.key);
 
       if (myLike && partnerLike) {
         matches.push(movie);
@@ -113,7 +115,7 @@ export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, o
                       <h4 className="w-title">{movie.title}</h4>
                       <div className="match-partner-row">
                         <span className="match-tag-pill active">Tú ❤️</span>
-                        <span className="match-tag-pill partner">Ella 💖</span>
+                        <span className="match-tag-pill partner">{partnerUser ? partnerUser.username : 'Pareja'} 💖</span>
                       </div>
                     </div>
                     <button 
@@ -163,9 +165,9 @@ export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, o
           {partnerWants.length > 0 && (
             <div className="watchlist-section">
               <h4 className="section-title partner-title">
-                💕 Sus Antojos <span className="badge-count">{partnerWants.length}</span>
+                💕 {partnerUser ? `Antojos de ${partnerUser.username}` : 'Sus Antojos'} <span className="badge-count">{partnerWants.length}</span>
               </h4>
-              <p className="partner-section-hint">A ella le gustaría ver estas películas. ¡Dale ❤️ en la pestaña Estrenos para programar la cita!</p>
+              <p className="partner-section-hint">{partnerUser ? `A ${partnerUser.username} le gustaría ver estas películas.` : 'A tu pareja le gustaría ver estas películas.'} ¡Dale ❤️ en la pestaña Estrenos para programar la cita!</p>
               <div className="watchlist-list">
                 {partnerWants.map(movie => (
                   <div key={movie.key} className="watchlist-card glass-card partner-card">

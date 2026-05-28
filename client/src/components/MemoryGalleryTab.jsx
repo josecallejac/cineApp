@@ -22,16 +22,24 @@ function formatDateLong(dateStr) {
   }
 }
 
-function MemoryGalleryTab({ ratingsList, activeProfile }) {
+function MemoryGalleryTab({ ratingsList, activeProfile, partnerUser }) {
   const [lightbox, setLightbox] = useState(null); // { ratingId, photoIndex }
 
   // Filter only ratings that have photos, sorted newest first
   const memories = useMemo(() => {
-    if (!ratingsList) return [];
+    if (!ratingsList || !activeProfile) return [];
     return ratingsList
       .filter(r => r.photos && Array.isArray(r.photos) && r.photos.length > 0)
+      .filter(r => {
+        if (partnerUser) {
+          // Si está en pareja, mostrar fotos de ambos
+          return r.userId === activeProfile.id || r.userId === partnerUser.id;
+        }
+        // Si está soltero, mostrar solo sus fotos propias
+        return r.userId === activeProfile.id;
+      })
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [ratingsList]);
+  }, [ratingsList, activeProfile, partnerUser]);
 
   // Lightbox helpers
   const openLightbox = (ratingId, photoIndex) => {
