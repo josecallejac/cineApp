@@ -1,6 +1,36 @@
 import React, { useState } from 'react';
 import { API_BASE_URL } from '../config';
 
+// SVG Icons — tamaño fijo, sin problemas de superposición como los emojis
+const IconUser = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
+const IconLock = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+
+const IconEye = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
+const IconEyeOff = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+    <line x1="1" y1="1" x2="23" y2="23"/>
+  </svg>
+);
+
 export default function AuthScreen({ onLoginSuccess }) {
   const [isLoginTab, setIsLoginTab] = useState(true);
   
@@ -8,6 +38,8 @@ export default function AuthScreen({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -125,7 +157,7 @@ export default function AuthScreen({ onLoginSuccess }) {
           <div className="form-input-group">
             <label className="input-label">Nombre de Usuario</label>
             <div className="input-field-wrap">
-              <span className="input-icon">@</span>
+              <span className="input-icon"><IconUser /></span>
               <input
                 type="text"
                 className="auth-input-field"
@@ -141,15 +173,24 @@ export default function AuthScreen({ onLoginSuccess }) {
           <div className="form-input-group">
             <label className="input-label">Contraseña</label>
             <div className="input-field-wrap">
-              <span className="input-icon">🔑</span>
+              <span className="input-icon"><IconLock /></span>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 className="auth-input-field"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
               />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(v => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {showPassword ? <IconEyeOff /> : <IconEye />}
+              </button>
             </div>
           </div>
 
@@ -157,15 +198,24 @@ export default function AuthScreen({ onLoginSuccess }) {
             <div className="form-input-group">
               <label className="input-label">Confirmar Contraseña</label>
               <div className="input-field-wrap">
-                <span className="input-icon">🔑</span>
+                <span className="input-icon"><IconLock /></span>
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   className="auth-input-field"
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   autoComplete="new-password"
                 />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowConfirmPassword(v => !v)}
+                  tabIndex={-1}
+                  aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showConfirmPassword ? <IconEyeOff /> : <IconEye />}
+                </button>
               </div>
             </div>
           )}
@@ -349,9 +399,38 @@ export default function AuthScreen({ onLoginSuccess }) {
         .input-icon {
           position: absolute;
           left: 12px;
-          font-size: 12px;
+          width: 16px;
+          height: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           color: var(--text-muted);
           pointer-events: none;
+          flex-shrink: 0;
+          z-index: 1;
+        }
+
+        .password-toggle-btn {
+          position: absolute;
+          right: 12px;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 0;
+          border-radius: 6px;
+          transition: color 0.2s ease, background 0.2s ease;
+          z-index: 1;
+        }
+
+        .password-toggle-btn:hover {
+          color: var(--text-primary);
+          background: rgba(255,255,255,0.06);
         }
 
         .auth-input-field {
@@ -361,10 +440,11 @@ export default function AuthScreen({ onLoginSuccess }) {
           border-radius: 10px;
           color: var(--text-primary);
           font-family: var(--font-sans);
-          font-size: 12px;
-          padding: 10px 12px 10px 34px;
+          font-size: 13px;
+          padding: 11px 40px 11px 40px;
           outline: none;
           transition: all 0.2s ease;
+          box-sizing: border-box;
         }
 
         .auth-input-field:focus {
