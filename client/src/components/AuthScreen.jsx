@@ -161,6 +161,7 @@ export default function AuthScreen({ onLoginSuccess }) {
               <input
                 type="text"
                 className="auth-input-field"
+                style={{ paddingLeft: '40px', paddingRight: '16px' }}
                 placeholder="ej: joseUribe"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -177,6 +178,7 @@ export default function AuthScreen({ onLoginSuccess }) {
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="auth-input-field"
+                style={{ paddingLeft: '40px', paddingRight: '44px' }}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -202,6 +204,7 @@ export default function AuthScreen({ onLoginSuccess }) {
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   className="auth-input-field"
+                  style={{ paddingLeft: '40px', paddingRight: '44px' }}
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
