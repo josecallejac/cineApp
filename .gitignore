@@ -21,7 +21,8 @@ server/*.stackdump
 response_debug.json
 
 # --- Compilados de Producción del Frontend ---
-# El build se autogenera en Vercel, no es necesario subirlo a GitHub
+# Railway hace el build automático con `npm run build`, no subir a GitHub
+client/dist/
 client/dist-ssr/
 
 # --- Variables de Entorno y Credenciales ---
