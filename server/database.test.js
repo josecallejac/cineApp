@@ -56,7 +56,8 @@ test.describe('CineGlow Database Unit Tests', () => {
       const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
       const dbUser = db.users.find(u => u.username === 'testuser');
       assert.ok(dbUser, 'El usuario debería guardarse en db.test.json');
-      assert.strictEqual(dbUser.password, 'pass123', 'La contraseña debería almacenarse en la base de datos');
+      assert.notStrictEqual(dbUser.password, 'pass123', 'La contraseña NO debería almacenarse en texto plano');
+      assert.match(dbUser.password, /^\$2[aby]\$/, 'La contraseña debería almacenarse como hash bcrypt');
     });
 
     test('Debería arrojar un error al registrar un usuario duplicado', () => {

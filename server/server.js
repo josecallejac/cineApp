@@ -14,23 +14,101 @@ app.use(express.json({ limit: '10mb' }));
 const clientDistPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientDistPath));
 
+// Servir las fotos de recuerdos guardadas como archivos
+app.use('/photos', express.static(database.photosDir, { maxAge: '365d', immutable: true }));
+
+// --- AUTENTICACIÓN CON TOKENS FIRMADOS (HMAC) ---
+const authCrypto = require('crypto');
+// Si no hay SESSION_SECRET configurado se genera uno por arranque
+// (los tokens se invalidan al reiniciar y el cliente vuelve al login)
+const SESSION_SECRET = process.env.SESSION_SECRET || authCrypto.randomBytes(32).toString('hex');
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+
+function createToken(userId) {
+  const payload = Buffer.from(JSON.stringify({ id: userId, exp: Date.now() + TOKEN_TTL_MS })).toString('base64url');
+  const sig = authCrypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig) return null;
+  const expected = authCrypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  const sigBuf = Buffer.from(sig);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length || !authCrypto.timingSafeEqual(sigBuf, expBuf)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
+    if (!data.id || Date.now() > data.exp) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// Endpoints públicos que no requieren token
+const PUBLIC_API_PATHS = ['/api/auth/', '/api/billboard', '/api/upcoming', '/api/stats', '/api/proxy-image'];
+
+app.use('/api', (req, res, next) => {
+  const fullPath = '/api' + req.path;
+  if (PUBLIC_API_PATHS.some(p => fullPath === p || fullPath.startsWith(p))) {
+    return next();
+  }
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  const session = verifyToken(token);
+  if (!session) {
+    return res.status(401).json({ error: 'Sesión inválida o expirada. Inicia sesión nuevamente.' });
+  }
+  req.userId = session.id;
+  next();
+});
+
+// Verifica que el userId declarado por el cliente coincida con el dueño del token
+function assertSelf(req, res, claimedUserId) {
+  if (!claimedUserId || claimedUserId === req.userId) return true;
+  res.status(403).json({ error: 'No autorizado para actuar en nombre de otro usuario.' });
+  return false;
+}
+
+// Rate limiting simple en memoria para los endpoints de autenticación
+const authAttempts = new Map();
+function authRateLimit(req, res, next) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 5 * 60 * 1000;
+  const entry = authAttempts.get(ip) || { count: 0, start: now };
+  if (now - entry.start > windowMs) {
+    entry.count = 0;
+    entry.start = now;
+  }
+  entry.count++;
+  authAttempts.set(ip, entry);
+  if (authAttempts.size > 10000) authAttempts.clear();
+  if (entry.count > 30) {
+    return res.status(429).json({ error: 'Demasiados intentos. Espera unos minutos.' });
+  }
+  next();
+}
+
 // Endpoint de Registro de Usuario
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', authRateLimit, (req, res) => {
   try {
     const { username, password, name } = req.body;
     const user = database.registerUser(username, password, name);
-    res.status(201).json(user);
+    res.status(201).json({ ...user, token: createToken(user.id) });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
 // Endpoint de Inicio de Sesión
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authRateLimit, (req, res) => {
   try {
     const { username, password } = req.body;
     const user = database.loginUser(username, password);
-    res.json(user);
+    res.json({ ...user, token: createToken(user.id) });
   } catch (error) {
     res.status(401).json({ error: error.message });
   }
@@ -39,28 +117,60 @@ app.post('/api/auth/login', (req, res) => {
 // Caché en memoria para almacenar los posters en alta resolución de TMDB
 const tmdbPosterCache = {};
 
+// Caché del scrape de Cinépolis compartido entre /api/billboard y /api/stats
+const CINEPOLIS_URL = "https://cinepolischile.cl/Cartelera.aspx/GetNowPlayingByCity";
+const CINEPOLIS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const CINEPOLIS_CACHE_TTL_MS = 10 * 60 * 1000;
+let cinepolisCache = { cinemas: null, fetchedAt: 0, pending: null };
+
+async function fetchCinepolisCinemas() {
+  const now = Date.now();
+  if (cinepolisCache.cinemas && (now - cinepolisCache.fetchedAt) < CINEPOLIS_CACHE_TTL_MS) {
+    return cinepolisCache.cinemas;
+  }
+  // Deduplicar requests concurrentes mientras hay un scrape en vuelo
+  if (cinepolisCache.pending) {
+    return cinepolisCache.pending;
+  }
+  cinepolisCache.pending = (async () => {
+    try {
+      const response = await fetch(CINEPOLIS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "User-Agent": CINEPOLIS_USER_AGENT
+        },
+        body: JSON.stringify({ claveCiudad: "santiago-oriente", esVIP: false })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error en la API de Cinépolis: ${response.statusText}`);
+      }
+
+      const rawData = await response.json();
+      const cinemas = rawData.d?.Cinemas || [];
+      cinepolisCache.cinemas = cinemas;
+      cinepolisCache.fetchedAt = Date.now();
+      return cinemas;
+    } catch (err) {
+      // Si el scrape falla pero tenemos datos viejos, servirlos como fallback
+      if (cinepolisCache.cinemas) {
+        console.error("[Cinépolis] Scrape falló, sirviendo caché expirado:", err.message);
+        return cinepolisCache.cinemas;
+      }
+      throw err;
+    } finally {
+      cinepolisCache.pending = null;
+    }
+  })();
+  return cinepolisCache.pending;
+}
+
 // Endpoint para obtener la cartelera consolidada y calificada de Sector Oriente
 app.get('/api/billboard', async (req, res) => {
   try {
-    // 1. Fetch live data from Cinepolis Chile
-    const response = await fetch("https://cinepolischile.cl/Cartelera.aspx/GetNowPlayingByCity", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      },
-      body: JSON.stringify({
-        claveCiudad: "santiago-oriente",
-        esVIP: false
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error en la API de Cinépolis: ${response.statusText}`);
-    }
-
-    const rawData = await response.json();
-    const cinemas = rawData.d?.Cinemas || [];
+    // 1. Fetch live data from Cinepolis Chile (con caché TTL)
+    const cinemas = await fetchCinepolisCinemas();
 
     // 2. Consolidar películas únicas de Sector Oriente
     const uniqueMovies = {};
@@ -144,37 +254,33 @@ app.get('/api/billboard', async (req, res) => {
       });
     });
 
-    // ⚡ RESOLVEDOR SÍNCRONO SECUENCIAL DE POSTERS HD (TMDB) CON MARGEN DE TIEMPO (PREVIENE ECONNRESET)
+    // ⚡ RESOLVEDOR DE POSTERS HD (TMDB) — en paralelo; solo consulta películas sin caché
     const tmdbApiKey = process.env.TMDB_API_KEY;
     if (tmdbApiKey) {
-      const movieKeys = Object.keys(uniqueMovies);
-      console.log(`[TMDB] Verificando y resolviendo posters HD para ${movieKeys.length} películas únicas de forma segura...`);
-      
-      for (const mKey of movieKeys) {
-        const movie = uniqueMovies[mKey];
-        if (tmdbPosterCache[mKey]) {
-          movie.poster = tmdbPosterCache[mKey];
-          continue;
+      const uncached = Object.values(uniqueMovies).filter(movie => {
+        if (tmdbPosterCache[movie.key]) {
+          movie.poster = tmdbPosterCache[movie.key];
+          return false;
         }
+        return true;
+      });
 
-        try {
-          // Sutil delay de 35ms entre peticiones secuenciales para no saturar sockets y evitar bloqueos por DDoS/rate-limiting
-          await new Promise(resolve => setTimeout(resolve, 35));
-
-          const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(movie.title)}&language=es-CL`);
-          const data = await res.json();
-          if (data.results && data.results.length > 0) {
-            const match = data.results.find(r => r.poster_path);
+      if (uncached.length > 0) {
+        console.log(`[TMDB] Resolviendo posters HD en paralelo para ${uncached.length} películas...`);
+        await Promise.all(uncached.map(async (movie) => {
+          try {
+            const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(movie.title)}&language=es-CL`);
+            const data = await res.json();
+            const match = (data.results || []).find(r => r.poster_path);
             if (match) {
               const hdPoster = `https://image.tmdb.org/t/p/w500${match.poster_path}`;
-              tmdbPosterCache[mKey] = hdPoster;
+              tmdbPosterCache[movie.key] = hdPoster;
               movie.poster = hdPoster;
-              console.log(`[TMDB] Poster HD resuelto con éxito para: ${movie.title}`);
             }
+          } catch (err) {
+            console.error(`[TMDB] Error al buscar poster de ${movie.title}:`, err.message);
           }
-        } catch (err) {
-          console.error(`[TMDB] Error al buscar poster de ${movie.title} síncronamente:`, err.message);
-        }
+        }));
       }
     }
 
@@ -204,6 +310,7 @@ app.get('/api/ratings/:movieKey', (req, res) => {
 // Endpoint para guardar una valoración
 app.post('/api/ratings', (req, res) => {
   try {
+    if (!assertSelf(req, res, req.body.userId)) return;
     const newRating = database.addRating(req.body);
     res.status(201).json(newRating);
   } catch (error) {
@@ -218,6 +325,7 @@ app.post('/api/users/add-points', (req, res) => {
     if (!userId || typeof amount !== 'number') {
       return res.status(400).json({ error: "userId y amount son requeridos." });
     }
+    if (!assertSelf(req, res, userId)) return;
     const updatedUser = database.addPoints(userId, amount);
     res.json(updatedUser);
   } catch (error) {
@@ -238,22 +346,10 @@ app.get('/api/ratings', (req, res) => {
 // Endpoint para estadísticas analíticas de la cartelera y valoraciones
 app.get('/api/stats', async (req, res) => {
   try {
-    // Necesitamos la cartelera para cruzar datos
-    const response = await fetch("https://cinepolischile.cl/Cartelera.aspx/GetNowPlayingByCity", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "User-Agent": "Mozilla/5.0"
-      },
-      body: JSON.stringify({ claveCiudad: "santiago-oriente", esVIP: false })
-    });
-    
+    // Necesitamos la cartelera para cruzar datos (caché compartido con /api/billboard)
     const moviesCount = new Set();
-
-    if (response.ok) {
-      const rawData = await response.json();
-      const cinemas = rawData.d?.Cinemas || [];
-      
+    try {
+      const cinemas = await fetchCinepolisCinemas();
       cinemas.forEach(cinema => {
         cinema.Dates.forEach(date => {
           (date.Movies || []).forEach(movie => {
@@ -261,6 +357,8 @@ app.get('/api/stats', async (req, res) => {
           });
         });
       });
+    } catch (err) {
+      console.error("[Stats] No se pudo obtener la cartelera:", err.message);
     }
 
     const allRatings = database.getRatings();
@@ -374,7 +472,7 @@ const UPCOMING_MOVIES = [
     originalTitle: "The Batman Part II",
     releaseDate: "2026-10-02",
     genres: ["Acción", "Crimen", "Drama"],
-    poster: "/batman_2_poster.png",
+    poster: "/batman_2_poster.webp",
     synopsis: "Robert Pattinson regresa como el Caballero de la Noche en esta secuela directa de la aclamada obra policial de Matt Reeves en una Gotham sumida en el caos.",
     distributor: "Warner Bros. Pictures",
     director: "Matt Reeves",
@@ -398,7 +496,7 @@ const UPCOMING_MOVIES = [
     originalTitle: "Shrek 5",
     releaseDate: "2026-07-01",
     genres: ["Animación", "Comedia", "Fantasía"],
-    poster: "/shrek_5_poster.png",
+    poster: "/shrek_5_poster.webp",
     synopsis: "¡El ogro más famoso del cine regresa! Mike Myers, Eddie Murphy y Cameron Diaz vuelven en la esperada quinta entrega para recordarnos por qué el pantano es sagrado.",
     distributor: "Universal Pictures",
     director: "Walt Dohrn",
@@ -433,6 +531,7 @@ app.get('/api/upcoming', (req, res) => {
 app.get('/api/watchlist', (req, res) => {
   try {
     const { userId } = req.query;
+    if (!assertSelf(req, res, userId)) return;
     const list = database.getWatchlist();
 
     if (!userId) {
@@ -473,6 +572,7 @@ app.post('/api/watchlist/toggle', (req, res) => {
     if (!userId || !movieKey) {
       return res.status(400).json({ error: "userId y movieKey son requeridos." });
     }
+    if (!assertSelf(req, res, userId)) return;
     const result = database.toggleWatchlist(userId, movieKey);
     res.json(result);
   } catch (error) {
@@ -490,6 +590,7 @@ app.post('/api/users/link', (req, res) => {
     if (!userId || !partnerUsername) {
       return res.status(400).json({ error: "userId y partnerUsername son requeridos." });
     }
+    if (!assertSelf(req, res, userId)) return;
     const result = database.linkUsers(userId, partnerUsername);
     res.json(result);
   } catch (error) {
@@ -515,6 +616,7 @@ app.post('/api/users/unlink', (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: "userId es requerido." });
     }
+    if (!assertSelf(req, res, userId)) return;
     const result = database.unlinkUsers(userId);
     res.json(result);
   } catch (error) {
@@ -534,10 +636,29 @@ if (!fsSync.existsSync(cacheDir)) {
   fsSync.mkdirSync(cacheDir);
 }
 
+// Solo se permite proxear imágenes de los orígenes que usa la app (posters y avatares)
+const PROXY_ALLOWED_HOSTS = [
+  'static.cinepolis.com',
+  'cinepolischile.cl',
+  'www.cinepolischile.cl',
+  'image.tmdb.org',
+  'api.dicebear.com'
+];
+
 app.get('/api/proxy-image', (req, res) => {
   const imageUrl = req.query.url;
   if (!imageUrl) {
     return res.status(400).send('URL query parameter is required');
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(imageUrl);
+  } catch {
+    return res.status(400).send('Invalid URL');
+  }
+  if (parsedUrl.protocol !== 'https:' || !PROXY_ALLOWED_HOSTS.includes(parsedUrl.hostname)) {
+    return res.status(403).send('Host no permitido por el proxy de imágenes');
   }
 
   const getCacheFilename = (url) => {
@@ -564,7 +685,15 @@ app.get('/api/proxy-image', (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'image/jpeg');
       
-      const fileStream = fsSync.createWriteStream(cacheFile);
+      // Escribir a un archivo temporal y renombrar al terminar (evita servir cachés a medio escribir)
+      const tmpFile = cacheFile + '.tmp';
+      const fileStream = fsSync.createWriteStream(tmpFile);
+      fileStream.on('finish', () => {
+        fsSync.rename(tmpFile, cacheFile, () => {});
+      });
+      fileStream.on('error', () => {
+        fsSync.unlink(tmpFile, () => {});
+      });
       proxyRes.pipe(fileStream);
       proxyRes.pipe(res);
     }).on('error', (err) => {
@@ -586,6 +715,7 @@ app.post('/api/envelopes', (req, res) => {
     if (!userId || !text) {
       return res.status(400).json({ error: 'Faltan parámetros requeridos: userId y text son obligatorios.' });
     }
+    if (!assertSelf(req, res, userId)) return;
     const envelope = database.saveEnvelope({ userId, ideaIndex, emoji, text, tip, movieTitle, movieKey });
     res.status(201).json(envelope);
   } catch (error) {
@@ -600,6 +730,7 @@ app.get('/api/envelopes', (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: 'Falta el parámetro userId en la consulta.' });
     }
+    if (!assertSelf(req, res, userId)) return;
     const envelopes = database.getUserEnvelopes(userId);
     res.json(envelopes);
   } catch (error) {
@@ -627,6 +758,7 @@ app.post('/api/appointments', (req, res) => {
     if (!userId || !title || !date) {
       return res.status(400).json({ error: 'Faltan parámetros requeridos: userId, title y date son obligatorios.' });
     }
+    if (!assertSelf(req, res, userId)) return;
     const appointment = database.createAppointment({ userId, title, movieTitle, movieKey, date, cinemaName, menuOption, notes });
     res.status(201).json(appointment);
   } catch (error) {
@@ -638,7 +770,8 @@ app.post('/api/appointments', (req, res) => {
 app.get('/api/appointments', (req, res) => {
   try {
     const { userId } = req.query;
-    const appointments = database.getUserAppointments(userId);
+    if (!assertSelf(req, res, userId)) return;
+    const appointments = database.getUserAppointments(userId || req.userId);
     res.json(appointments);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -665,6 +798,8 @@ app.post('/api/notifications', (req, res) => {
     if (!userId || !senderId || !title || !message) {
       return res.status(400).json({ error: 'Faltan parámetros: userId, senderId, title y message son obligatorios.' });
     }
+    // El remitente debe ser el dueño del token (el destinatario userId puede ser la pareja)
+    if (!assertSelf(req, res, senderId)) return;
     const notification = database.createNotification({ userId, senderId, senderName, senderAvatar, type, title, message });
     res.status(201).json(notification);
   } catch (error) {
@@ -679,6 +814,7 @@ app.get('/api/notifications', (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: 'Falta el parámetro userId en la consulta.' });
     }
+    if (!assertSelf(req, res, userId)) return;
     const notifications = database.getUserNotifications(userId);
     res.json(notifications);
   } catch (error) {
@@ -693,6 +829,7 @@ app.put('/api/notifications/read', (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: 'Falta el parámetro userId en el cuerpo de la consulta.' });
     }
+    if (!assertSelf(req, res, userId)) return;
     const result = database.markNotificationsAsRead(userId);
     res.json(result);
   } catch (error) {
@@ -704,6 +841,10 @@ app.put('/api/notifications/read', (req, res) => {
 const { execSync } = require('child_process');
 
 app.get('/api/context', (req, res) => {
+  // Deshabilitado en producción: ejecuta un proceso síncrono que bloquea el event loop
+  if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_VOLUME_PATH) {
+    return res.status(404).json({ error: 'No disponible en producción.' });
+  }
   try {
     const contextScriptPath = pathSync.join(__dirname, '..', 'generate-context.js');
     const contextOutputPath = pathSync.join(__dirname, '..', 'context.md');

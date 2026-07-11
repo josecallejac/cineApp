@@ -1,5 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
+
+const BCRYPT_ROUNDS = 10;
+
+// ¿El valor almacenado ya es un hash bcrypt?
+function isBcryptHash(value) {
+  return typeof value === 'string' && /^\$2[aby]\$/.test(value);
+}
 
 const dbFilename = process.env.NODE_ENV === 'test' ? 'db.test.json' : 'db.json';
 const dbPath = process.env.RAILWAY_VOLUME_PATH 
@@ -10,6 +18,27 @@ const dbPath = process.env.RAILWAY_VOLUME_PATH
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
+}
+
+// Directorio de fotos de recuerdos: las imágenes se guardan como archivos
+// (no como base64 dentro de db.json) y se sirven vía /photos/<archivo>
+const photosDir = process.env.RAILWAY_VOLUME_PATH
+  ? path.join(process.env.RAILWAY_VOLUME_PATH, 'photos')
+  : path.join(__dirname, 'photos');
+if (!fs.existsSync(photosDir)) {
+  fs.mkdirSync(photosDir, { recursive: true });
+}
+
+// Convierte un data URI base64 en archivo dentro de photosDir y retorna su URL pública.
+// Las URLs ya existentes (http/https o /photos/...) se retornan intactas.
+function persistPhoto(photo, hint) {
+  if (typeof photo !== 'string' || !photo.startsWith('data:')) return photo;
+  const match = photo.match(/^data:image\/(\w+);base64,(.+)$/s);
+  if (!match) return null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  const filename = `${hint}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  fs.writeFileSync(path.join(photosDir, filename), Buffer.from(match[2], 'base64'));
+  return `/photos/${filename}`;
 }
 
 // Cuentas demo predeterminadas
@@ -96,7 +125,15 @@ function initDb() {
         data.notifications = [];
         modified = true;
       }
-      
+
+      // Migrar fotos base64 heredadas dentro de db.json a archivos en photosDir
+      (data.ratings || []).forEach(r => {
+        if (r.photos && r.photos.some(p => typeof p === 'string' && p.startsWith('data:'))) {
+          r.photos = r.photos.map(p => persistPhoto(p, 'rating')).filter(Boolean);
+          modified = true;
+        }
+      });
+
       if (modified) {
         fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf-8');
       }
@@ -115,17 +152,79 @@ function initDb() {
   }
 }
 
-// Cargar base de datos
+// --- Persistencia: la DB vive en memoria y se escribe a disco de forma
+// asíncrona con debounce (evita I/O síncrono bloqueante y race conditions
+// de lecturas/escrituras de archivo completo por operación) ---
+
+let dbCache = null;
+let writeTimer = null;
+let writeInFlight = false;
+let writeQueued = false;
+
+// Cargar base de datos (desde memoria; solo lee disco la primera vez)
 function loadDb() {
-  initDb();
-  const data = fs.readFileSync(dbPath, 'utf-8');
-  return JSON.parse(data);
+  if (!dbCache) {
+    initDb();
+    dbCache = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
+  }
+  return dbCache;
 }
 
-// Guardar base de datos
-function saveDb(data) {
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf-8');
+// Escritura atómica a disco (archivo temporal + rename)
+function flushToDisk() {
+  if (!dbCache) return;
+  if (writeInFlight) {
+    writeQueued = true;
+    return;
+  }
+  writeInFlight = true;
+  const tmpPath = dbPath + '.tmp';
+  const payload = JSON.stringify(dbCache, null, 2);
+  fs.writeFile(tmpPath, payload, 'utf-8', (err) => {
+    if (err) {
+      console.error('Error escribiendo db temporal:', err.message);
+      writeInFlight = false;
+      return;
+    }
+    fs.rename(tmpPath, dbPath, (renameErr) => {
+      writeInFlight = false;
+      if (renameErr) console.error('Error renombrando db:', renameErr.message);
+      if (writeQueued) {
+        writeQueued = false;
+        flushToDisk();
+      }
+    });
+  });
 }
+
+// Escritura síncrona (para tests y apagado del proceso)
+function flushToDiskSync() {
+  if (!dbCache) return;
+  fs.writeFileSync(dbPath, JSON.stringify(dbCache, null, 2), 'utf-8');
+}
+
+// Guardar base de datos: actualiza memoria y agenda la escritura a disco
+function saveDb(data) {
+  dbCache = data;
+  if (process.env.NODE_ENV === 'test') {
+    // En tests la escritura es inmediata para que las aserciones lean el archivo
+    flushToDiskSync();
+    return;
+  }
+  if (writeTimer) clearTimeout(writeTimer);
+  writeTimer = setTimeout(flushToDisk, 200);
+}
+
+// Garantizar que los cambios pendientes lleguen a disco al apagar el servidor
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    try { flushToDiskSync(); } catch (e) { console.error(e.message); }
+    process.exit(0);
+  });
+}
+process.on('beforeExit', () => {
+  try { flushToDiskSync(); } catch (e) { console.error(e.message); }
+});
 
 // --- Autenticación ---
 
@@ -148,7 +247,7 @@ function registerUser(username, password, name) {
   const newUser = {
     id: 'user_' + Date.now(),
     username: cleanUsername,
-    password: password.trim(), // Para demostración, guardamos simple
+    password: bcrypt.hashSync(password.trim(), BCRYPT_ROUNDS),
     name: name.trim(),
     avatar: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${cleanUsername}`,
     joinedAt: new Date().toISOString(),
@@ -173,9 +272,22 @@ function loginUser(username, password) {
   }
 
   const cleanUsername = username.trim().toLowerCase();
-  const user = db.users.find(u => u.username === cleanUsername && u.password === password.trim());
-  
-  if (!user) {
+  const cleanPassword = password.trim();
+  const user = db.users.find(u => u.username === cleanUsername);
+
+  let valid = false;
+  if (user) {
+    if (isBcryptHash(user.password)) {
+      valid = bcrypt.compareSync(cleanPassword, user.password);
+    } else if (user.password === cleanPassword) {
+      // Migración transparente: cuentas antiguas con contraseña en texto plano
+      valid = true;
+      user.password = bcrypt.hashSync(cleanPassword, BCRYPT_ROUNDS);
+      saveDb(db);
+    }
+  }
+
+  if (!valid) {
     throw new Error("Credenciales inválidas. Revisa tu usuario y contraseña.");
   }
 
@@ -231,7 +343,9 @@ function addRating(ratingData) {
     cinemaName: (existingRating && existingRating.cinemaName) ? existingRating.cinemaName : (cinemaName || null),
     menuOption: (existingRating && existingRating.menuOption) ? existingRating.menuOption : (menuOption || null),
     moodOption: (existingRating && existingRating.moodOption) ? existingRating.moodOption : (moodOption || null),
-    photos: (existingRating && existingRating.photos && existingRating.photos.length > 0) ? existingRating.photos : (photos || []),
+    photos: (existingRating && existingRating.photos && existingRating.photos.length > 0)
+      ? existingRating.photos
+      : (photos || []).map(p => persistPhoto(p, 'rating')).filter(Boolean),
     timestamp: new Date().toISOString()
   };
 
@@ -407,10 +521,16 @@ function createAppointment({ userId, title, movieTitle, movieKey, date, cinemaNa
   return appointment;
 }
 
-// Obtener todas las citas compartidas (ordenadas por fecha)
+// Obtener las citas del usuario y de su pareja vinculada (ordenadas por fecha)
 function getUserAppointments(userId) {
   const db = loadDb();
+  const user = db.users.find(u => u.id === userId);
+  const allowedIds = new Set([userId]);
+  if (user && user.partnerId) {
+    allowedIds.add(user.partnerId);
+  }
   return (db.appointments || [])
+    .filter(a => allowedIds.has(a.userId))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
@@ -570,7 +690,8 @@ module.exports = {
   markNotificationsAsRead,
   linkUsers,
   getPartner,
-  unlinkUsers
+  unlinkUsers,
+  photosDir
 };
 
 // Inicializar la base de datos inmediatamente al importar el módulo
