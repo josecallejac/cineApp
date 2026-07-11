@@ -419,100 +419,82 @@ app.get('/api/stats', async (req, res) => {
 // --- LISTADO DE ESTRENOS PRÓXIMOS (SIMULADO / OFFLINE) ---
 const UPCOMING_MOVIES = [
   {
-    key: "avatar-3",
-    title: "Avatar: Fire and Ash",
-    originalTitle: "Avatar: Fire and Ash",
-    releaseDate: "2026-12-18",
-    genres: ["Ciencia Ficción", "Acción", "Aventura"],
-    poster: "https://image.tmdb.org/t/p/w500/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg",
-    synopsis: "La tercera entrega de la saga de James Cameron explorará la tribu de los 'Pueblo de la Ceniza', Na'vi de fuego agresivos, ampliando el mundo de Pandora y enfrentando nuevos peligros.",
-    distributor: "20th Century Studios",
-    director: "James Cameron",
-    trailer: "https://www.youtube.com/watch?v=34_z6B0pSlo"
+    key: "the-odyssey",
+    title: "La Odisea",
+    originalTitle: "The Odyssey",
+    releaseDate: "2026-07-15",
+    genres: ["Aventura", "Fantasía", "Drama"],
+    poster: "https://image.tmdb.org/t/p/w500/bheY17L6wtB0SdJn6EYyh1X5iry.jpg",
+    synopsis: "La epopeya mitológica de Christopher Nolan sigue a Odiseo (Matt Damon) en su viaje de diez años de regreso a Ítaca tras la guerra de Troya, filmada íntegramente con cámaras IMAX.",
+    distributor: "Universal Pictures",
+    director: "Christopher Nolan"
+  },
+  {
+    key: "hunger-games-sunrise-reaping",
+    title: "Los Juegos del Hambre: Amanecer en la Cosecha",
+    originalTitle: "The Hunger Games: Sunrise on the Reaping",
+    releaseDate: "2026-11-18",
+    genres: ["Acción", "Aventura", "Ciencia Ficción"],
+    poster: "https://image.tmdb.org/t/p/w500/ffJaYMtB6v1TrvkyhCOqwqCKm0o.jpg",
+    synopsis: "Panem, 24 años antes de Katniss: la mañana de la cosecha de los 50º Juegos del Hambre marca el destino de un joven Haymitch Abernathy en la edición del Vasallaje de los Veinticinco.",
+    distributor: "Lionsgate",
+    director: "Francis Lawrence"
+  },
+  {
+    key: "avengers-doomsday",
+    title: "Vengadores: Doomsday",
+    originalTitle: "Avengers: Doomsday",
+    releaseDate: "2026-12-16",
+    genres: ["Acción", "Ciencia Ficción", "Aventura"],
+    poster: "https://image.tmdb.org/t/p/w500/rQKabpeIewLLNStFr3anEXI0xqu.jpg",
+    synopsis: "Robert Downey Jr. regresa al Universo Cinematográfico de Marvel como el icónico Doctor Doom en el inicio del clímax de la saga del multiverso, con los Vengadores, los 4 Fantásticos y los X-Men.",
+    distributor: "Marvel Studios",
+    director: "Anthony y Joe Russo",
+    trailer: "https://www.youtube.com/watch?v=NzsDtHCdhGc"
+  },
+  {
+    key: "dune-part-three",
+    title: "Dune: Parte Tres",
+    originalTitle: "Dune: Part Three",
+    releaseDate: "2026-12-16",
+    genres: ["Ciencia Ficción", "Aventura", "Drama"],
+    poster: "https://image.tmdb.org/t/p/w500/ceKywESF1WPVlfdYRTrvZbTkSXV.jpg",
+    synopsis: "Paul Atreides, ahora Emperador Muad'Dib, enfrenta enemigos políticos y una conspiración en su propio círculo en la conclusión de la trilogía de Denis Villeneuve, basada en 'El Mesías de Dune'.",
+    distributor: "Warner Bros. Pictures",
+    director: "Denis Villeneuve"
   },
   {
     key: "spiderman-beyond-spiderverse",
     title: "Spider-Man: Beyond the Spider-Verse",
     originalTitle: "Spider-Man: Beyond the Spider-Verse",
-    releaseDate: "2026-06-18",
+    releaseDate: "2027-06-17",
     genres: ["Animación", "Acción", "Aventura"],
-    poster: "https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg",
+    poster: "https://image.tmdb.org/t/p/w500/9PIhQqqI6Q4a5YjwMjxvzZcPJhf.jpg",
     synopsis: "La épica conclusión del viaje de Miles Morales a través del multiverso, donde deberá enfrentar a Spot y rescatar a su padre junto a Gwen Stacy y su equipo.",
     distributor: "Sony Pictures",
-    director: "Joaquim Dos Santos",
-    trailer: "https://www.youtube.com/watch?v=e5R_W-c8Z1w"
-  },
-  {
-    key: "superman-2026",
-    title: "Superman",
-    originalTitle: "Superman",
-    releaseDate: "2026-07-10",
-    genres: ["Acción", "Ciencia Ficción", "Aventura"],
-    poster: "https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg",
-    synopsis: "Superman sigue el viaje del superhéroe de DC para reconciliar su herencia kryptoniana con su educación humana en Smallville como Clark Kent, bajo la dirección de James Gunn.",
-    distributor: "Warner Bros. Pictures",
-    director: "James Gunn",
-    trailer: "https://www.youtube.com/watch?v=R9K18wW-e68"
-  },
-  {
-    key: "toy-story-5",
-    title: "Toy Story 5",
-    originalTitle: "Toy Story 5",
-    releaseDate: "2026-06-19",
-    genres: ["Animación", "Aventura", "Familia"],
-    poster: "https://image.tmdb.org/t/p/w500/1h9E37wO86XJ2C6C3p6aR1oO0oM.jpg",
-    synopsis: "Woody, Buzz y la pandilla regresan para una nueva aventura donde los juguetes tradicionales tendrán que competir cara a cara con las nuevas tecnologías y pantallas.",
-    distributor: "Walt Disney Studios",
-    director: "Andrew Stanton",
-    trailer: "https://www.youtube.com/watch?v=b4wH9hX_kS8"
-  },
-  {
-    key: "the-batman-2",
-    title: "The Batman Part II",
-    originalTitle: "The Batman Part II",
-    releaseDate: "2026-10-02",
-    genres: ["Acción", "Crimen", "Drama"],
-    poster: "/batman_2_poster.webp",
-    synopsis: "Robert Pattinson regresa como el Caballero de la Noche en esta secuela directa de la aclamada obra policial de Matt Reeves en una Gotham sumida en el caos.",
-    distributor: "Warner Bros. Pictures",
-    director: "Matt Reeves",
-    trailer: "https://www.youtube.com/watch?v=gT8B25s_kS8"
-  },
-  {
-    key: "wicked-part-2",
-    title: "Wicked: Part Two",
-    originalTitle: "Wicked: Part Two",
-    releaseDate: "2026-11-26",
-    genres: ["Fantasía", "Musical", "Drama"],
-    poster: "https://image.tmdb.org/t/p/w500/xDGbZ0JJ3mYaGKy4Nzd9Kph6M9L.jpg",
-    synopsis: "La espectacular conclusión del viaje musical que explora la amistad y rivalidad de Elphaba, la Bruja Mala del Oeste, y Glinda, la Bruja Buena del Norte.",
-    distributor: "Universal Pictures",
-    director: "Jon M. Chu",
-    trailer: "https://www.youtube.com/watch?v=gT8B25s_kS9"
+    director: "Joaquim Dos Santos"
   },
   {
     key: "shrek-5",
     title: "Shrek 5",
     originalTitle: "Shrek 5",
-    releaseDate: "2026-07-01",
+    releaseDate: "2027-06-30",
     genres: ["Animación", "Comedia", "Fantasía"],
     poster: "/shrek_5_poster.webp",
     synopsis: "¡El ogro más famoso del cine regresa! Mike Myers, Eddie Murphy y Cameron Diaz vuelven en la esperada quinta entrega para recordarnos por qué el pantano es sagrado.",
     distributor: "Universal Pictures",
-    director: "Walt Dohrn",
-    trailer: "https://www.youtube.com/watch?v=gT8B25s_kS10"
+    director: "Walt Dohrn"
   },
   {
-    key: "avengers-doomsday",
-    title: "Avengers: Doomsday",
-    originalTitle: "Avengers: Doomsday",
-    releaseDate: "2026-05-01",
-    genres: ["Acción", "Ciencia Ficción", "Aventura"],
-    poster: "https://image.tmdb.org/t/p/w500/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg",
-    synopsis: "Robert Downey Jr. regresa al Universo Cinematográfico de Marvel como el icónico supervillano Doctor Doom en el inicio del clímax de la saga del multiverso.",
-    distributor: "Marvel Studios",
-    director: "Anthony y Joe Russo",
-    trailer: "https://www.youtube.com/watch?v=gT8B25s_kS11"
+    key: "the-batman-2",
+    title: "The Batman: Parte II",
+    originalTitle: "The Batman Part II",
+    releaseDate: "2027-09-30",
+    genres: ["Acción", "Crimen", "Drama"],
+    poster: "/batman_2_poster.webp",
+    synopsis: "Robert Pattinson regresa como el Caballero de la Noche en esta secuela directa de la aclamada obra policial de Matt Reeves en una Gotham sumida en el caos.",
+    distributor: "Warner Bros. Pictures",
+    director: "Matt Reeves"
   }
 ];
 
