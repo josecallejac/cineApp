@@ -160,10 +160,11 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, pa
               return (
                 <div key={movie.key} className={`upcoming-card glass-card ${isMatch ? 'match-card-glow' : ''}`}>
                   <div className="card-poster-wrap">
-                    <img 
-                      src={movie.poster} 
-                      alt={movie.title} 
+                    <img
+                      src={movie.poster}
+                      alt={movie.title}
                       className="card-poster"
+                      loading="lazy"
                       onError={(e) => {
                         // Fallback si falla la carga de imagen
                         e.target.onerror = null;
@@ -258,7 +259,7 @@ export default function UpcomingTab({ activeProfile, onMovieClick, watchlist, pa
             <p className="match-subtitle">¡Tenemos una cita pendiente! 💘</p>
 
             <div className="match-movie-preview">
-              <img src={matchedMovie.poster} alt={matchedMovie.title} className="match-preview-poster" />
+              <img src={matchedMovie.poster} alt={matchedMovie.title} className="match-preview-poster" loading="lazy" />
               <div className="match-movie-info">
                 <h3>{matchedMovie.title}</h3>
                 <span className="match-date-badge">📅 Estreno: {formatDate(matchedMovie.releaseDate)}</span>

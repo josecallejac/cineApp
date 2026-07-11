@@ -16,6 +16,8 @@ server/db.json.backup
 
 # --- Caches y Archivos Temporales de Servidor ---
 server/cache/
+server/photos/
+server/db.json.tmp
 server/*.stackdump
 *.stackdump
 response_debug.json

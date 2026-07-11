@@ -109,7 +109,7 @@ export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, p
               <div className="watchlist-list matches-list">
                 {matches.map(movie => (
                   <div key={movie.key} className="watchlist-card glass-card match-card">
-                    <img src={movie.poster} alt={movie.title} className="w-card-poster" />
+                    <img src={movie.poster} alt={movie.title} className="w-card-poster" loading="lazy" />
                     <div className="w-card-info">
                       <span className="w-date-tag">Estreno: {formatDate(movie.releaseDate)}</span>
                       <h4 className="w-title">{movie.title}</h4>
@@ -141,7 +141,7 @@ export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, p
               <div className="watchlist-list">
                 {myWants.map(movie => (
                   <div key={movie.key} className="watchlist-card glass-card">
-                    <img src={movie.poster} alt={movie.title} className="w-card-poster" />
+                    <img src={movie.poster} alt={movie.title} className="w-card-poster" loading="lazy" />
                     <div className="w-card-info">
                       <span className="w-date-tag sub">Estreno: {formatDate(movie.releaseDate)}</span>
                       <h4 className="w-title">{movie.title}</h4>
@@ -171,7 +171,7 @@ export default function WatchlistTab({ activeProfile, onMovieClick, watchlist, p
               <div className="watchlist-list">
                 {partnerWants.map(movie => (
                   <div key={movie.key} className="watchlist-card glass-card partner-card">
-                    <img src={movie.poster} alt={movie.title} className="w-card-poster" />
+                    <img src={movie.poster} alt={movie.title} className="w-card-poster" loading="lazy" />
                     <div className="w-card-info">
                       <span className="w-date-tag sub">Estreno: {formatDate(movie.releaseDate)}</span>
                       <h4 className="w-title">{movie.title}</h4>

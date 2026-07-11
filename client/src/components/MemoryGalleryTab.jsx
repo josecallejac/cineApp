@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { resolveAssetUrl } from '../config';
 
 const MOOD_EMOJIS = {
   'Increíble': '🥰',
@@ -137,7 +138,7 @@ function MemoryGalleryTab({ ratingsList, activeProfile, partnerUser }) {
                       className="mg-photo-thumb"
                       onClick={() => openLightbox(rating.id, pIdx)}
                     >
-                      <img src={photo} alt={`Recuerdo ${pIdx + 1}`} />
+                      <img src={resolveAssetUrl(photo)} alt={`Recuerdo ${pIdx + 1}`} loading="lazy" />
                       {pIdx === 5 && rating.photos.length > 6 && (
                         <div className="mg-photo-more">+{rating.photos.length - 6}</div>
                       )}
@@ -199,7 +200,7 @@ function MemoryGalleryTab({ ratingsList, activeProfile, partnerUser }) {
             {/* Photo */}
             <img
               className="mg-lightbox-photo"
-              src={lightboxPhoto}
+              src={resolveAssetUrl(lightboxPhoto)}
               alt={lightboxRating.movieTitle}
             />
 

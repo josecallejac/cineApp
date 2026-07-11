@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import RatingStars from './RatingStars';
 import AppointmentsTab from './AppointmentsTab';
 import SavedEnvelopesTab from './SavedEnvelopesTab';
+import { resolveAssetUrl } from '../config';
 
-export default function MyRatingsTab({ activeProfile, ratingsList, movies, onMovieClick }) {
+export default function MyRatingsTab({ activeProfile, ratingsList, movies, onMovieClick, partnerUser = null }) {
   const [activeSubTab, setActiveSubTab] = useState('ratings'); // 'ratings' | 'calendar' | 'envelopes'
   const [prefilledAptData, setPrefilledAptData] = useState(null);
 
@@ -45,13 +46,15 @@ export default function MyRatingsTab({ activeProfile, ratingsList, movies, onMov
           <span className="tab-icon">📅</span>
           <span className="tab-text">Calendario</span>
         </button>
-        <button 
-          className={`nav-tab-btn ${activeSubTab === 'envelopes' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('envelopes')}
-        >
-          <span className="tab-icon">✉️</span>
-          <span className="tab-text">Sobres</span>
-        </button>
+        {partnerUser && (
+          <button 
+            className={`nav-tab-btn ${activeSubTab === 'envelopes' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('envelopes')}
+          >
+            <span className="tab-icon">✉️</span>
+            <span className="tab-text">Sobres</span>
+          </button>
+        )}
       </div>
 
       {/* Renderizado Condicional de las Sub-pestañas */}
@@ -129,7 +132,7 @@ export default function MyRatingsTab({ activeProfile, ratingsList, movies, onMov
                       <div className="history-photos-grid">
                         {rating.photos.map((photo, pIdx) => (
                           <div key={pIdx} className="history-photo-thumb">
-                            <img src={photo} alt={`Recuerdo ${pIdx + 1}`} />
+                            <img src={resolveAssetUrl(photo)} alt={`Recuerdo ${pIdx + 1}`} loading="lazy" />
                           </div>
                         ))}
                       </div>
@@ -168,7 +171,7 @@ export default function MyRatingsTab({ activeProfile, ratingsList, movies, onMov
         )}
 
         {/* Sub-Tab 3: Sobres Guardados */}
-        {activeSubTab === 'envelopes' && (
+        {activeSubTab === 'envelopes' && partnerUser && (
           <SavedEnvelopesTab 
             activeProfile={activeProfile}
             onScheduleWithIdea={handleScheduleWithIdea}

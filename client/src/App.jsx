@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import BottomTabBar from './components/BottomTabBar';
 import BillboardTab from './components/BillboardTab';
-import DuoTab from './components/DuoTab';
-import MyRatingsTab from './components/MyRatingsTab';
-import MovieBottomSheet from './components/MovieBottomSheet';
 import AuthScreen from './components/AuthScreen';
 import SocialTab from './components/SocialTab';
 import UpcomingTab from './components/UpcomingTab';
-import WatchlistTab from './components/WatchlistTab';
-import MemoryGalleryTab from './components/MemoryGalleryTab';
+import MyRatingsTab from './components/MyRatingsTab';
 import { API_BASE_URL } from './config';
+
+// Carga diferida de vistas pesadas o condicionales para reducir el bundle inicial
+const MovieBottomSheet = lazy(() => import('./components/MovieBottomSheet'));
+const DuoTab = lazy(() => import('./components/DuoTab'));
+const WatchlistTab = lazy(() => import('./components/WatchlistTab'));
+const MemoryGalleryTab = lazy(() => import('./components/MemoryGalleryTab'));
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('billboard');
@@ -29,27 +31,51 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
 
-  // Cargar notificaciones de este usuario
-  const fetchNotifications = async () => {
+  // Cargar notificaciones de este usuario (solo actualiza estado si hubo cambios)
+  const fetchNotifications = useCallback(async () => {
     if (!currentUser) return;
     try {
       const response = await fetch(`${API_BASE_URL}/api/notifications?userId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data);
+        setNotifications(prev =>
+          JSON.stringify(prev) === JSON.stringify(data) ? prev : data
+        );
       }
     } catch (e) {
       console.error("Error cargando notificaciones:", e);
     }
-  };
+  }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 8000); // Polling cada 8s para simular en vivo
-      return () => clearInterval(interval);
-    }
-  }, [currentUser]);
+    if (!currentUser) return;
+    fetchNotifications();
+    // Polling cada 30s, pausado mientras la app está en segundo plano (ahorra batería y datos)
+    let interval = null;
+    const startPolling = () => {
+      if (!interval) interval = setInterval(fetchNotifications, 30000);
+    };
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        fetchNotifications();
+        startPolling();
+      }
+    };
+    if (!document.hidden) startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [currentUser, fetchNotifications]);
 
   const handleMarkNotificationsAsRead = async () => {
     if (!currentUser) return;
@@ -82,7 +108,7 @@ export default function App() {
   }, []);
 
   // 2. Cargar Cartelera en vivo de Cinepolis Sector Oriente
-  const fetchBillboard = async () => {
+  const fetchBillboard = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/billboard`);
@@ -95,10 +121,10 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // 3. Cargar listado global de valoraciones realizadas
-  const fetchRatings = async () => {
+  const fetchRatings = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/ratings`);
       if (response.ok) {
@@ -108,10 +134,10 @@ export default function App() {
     } catch (err) {
       console.error("Error cargando valoraciones:", err);
     }
-  };
+  }, []);
 
   // 4. Cargar la watchlist compartida (con soporte de pareja y matches de cita)
-  const fetchWatchlist = async () => {
+  const fetchWatchlist = useCallback(async () => {
     if (!currentUser) return;
     try {
       const response = await fetch(`${API_BASE_URL}/api/watchlist?userId=${currentUser.id}`);
@@ -130,10 +156,10 @@ export default function App() {
     } catch (err) {
       console.error("Error cargando watchlist:", err);
     }
-  };
+  }, [currentUser]);
 
-  // Helper para verificar si hay por lo menos un "Cine-Match" en pareja
-  const hasWatchlistMatches = () => {
+  // ¿Hay por lo menos un "Cine-Match" en pareja?
+  const showWatchlistTab = useMemo(() => {
     if (watchlistMatches && watchlistMatches.length > 0) return true;
     if (!watchlist || watchlist.length === 0) return false;
     const movieLikes = {};
@@ -144,7 +170,7 @@ export default function App() {
       movieLikes[item.movieKey].add(item.userId);
     });
     return Object.values(movieLikes).some(userIdSet => userIdSet.size >= 2);
-  };
+  }, [watchlist, watchlistMatches]);
 
   // Carga inicial de datos cuando hay un usuario autenticado
   useEffect(() => {
@@ -153,23 +179,23 @@ export default function App() {
       fetchRatings();
       fetchWatchlist();
     }
-  }, [currentUser]);
+  }, [currentUser, fetchBillboard, fetchRatings, fetchWatchlist]);
 
-  // Helper para verificar si hay por lo menos una foto registrada
-  const hasMemories = () => {
+  // ¿Hay por lo menos una foto registrada?
+  const hasMemories = useMemo(() => {
     if (!ratingsList || ratingsList.length === 0) return false;
     return ratingsList.some(r => r.photos && Array.isArray(r.photos) && r.photos.length > 0);
-  };
+  }, [ratingsList]);
 
   // Redireccionar automáticamente si se elimina la última coincidencia (Cine-Match)
   useEffect(() => {
-    if (currentTab === 'watchlist' && !hasWatchlistMatches()) {
+    if (currentTab === 'watchlist' && !showWatchlistTab) {
       setCurrentTab('upcoming');
     }
-    if (currentTab === 'memories' && !hasMemories()) {
+    if (currentTab === 'memories' && !hasMemories) {
       setCurrentTab('billboard');
     }
-  }, [watchlist, ratingsList, currentTab]);
+  }, [showWatchlistTab, hasMemories, currentTab]);
 
   // Scroll automático al inicio de la pestaña al cambiar de tab
   useEffect(() => {
@@ -180,7 +206,7 @@ export default function App() {
   }, [currentTab]);
 
   // 🔔 Detectar películas de la Watchlist del usuario que ya están en cartelera
-  const getBillboardAlerts = () => {
+  const billboardAlerts = useMemo(() => {
     if (!currentUser || !watchlist || !movies || movies.length === 0) return [];
     // Películas que el usuario actual marcó en su watchlist
     const myWatchlistKeys = new Set(
@@ -193,16 +219,16 @@ export default function App() {
     return movies
       .filter(m => myWatchlistKeys.has(m.key))
       .map(m => m.key);
-  };
-
-  const billboardAlerts = getBillboardAlerts();
+  }, [currentUser, watchlist, movies]);
 
   // Refrescar al interactuar
-  const handleRefreshBillboard = () => {
+  const handleRefreshBillboard = useCallback(() => {
     fetchBillboard();
     fetchRatings();
     fetchWatchlist();
-  };
+  }, [fetchBillboard, fetchRatings, fetchWatchlist]);
+
+  const handleCloseSheet = useCallback(() => setSelectedMovie(null), []);
 
   // Manejar Login exitoso
   const handleLoginSuccess = (user) => {
@@ -409,12 +435,15 @@ export default function App() {
 
       {/* Main Tab Views scrollable zone */}
       <main className="scroll-container">
+        <Suspense fallback={null}>
         {currentTab === 'billboard' && (
           <BillboardTab
             movies={movies}
             onMovieClick={setSelectedMovie}
             isLoading={isLoading}
             billboardAlerts={billboardAlerts}
+            ratingsList={ratingsList}
+            currentUser={currentUser}
           />
         )}
 
@@ -465,6 +494,7 @@ export default function App() {
             ratingsList={ratingsList}
             movies={movies}
             onMovieClick={setSelectedMovie}
+            partnerUser={partnerUser}
           />
         )}
 
@@ -475,25 +505,29 @@ export default function App() {
             partnerUser={partnerUser}
           />
         )}
+        </Suspense>
       </main>
 
       {/* Bottom Sheets details panel */}
       {selectedMovie && currentUser && (
-        <MovieBottomSheet
-          movie={selectedMovie}
-          onClose={() => setSelectedMovie(null)}
-          activeProfile={currentUser}
-          ratingsList={ratingsList}
-          onRefreshBillboard={handleRefreshBillboard}
-        />
+        <Suspense fallback={null}>
+          <MovieBottomSheet
+            movie={selectedMovie}
+            onClose={handleCloseSheet}
+            activeProfile={currentUser}
+            ratingsList={ratingsList}
+            onRefreshBillboard={handleRefreshBillboard}
+            partnerUser={partnerUser}
+          />
+        </Suspense>
       )}
 
       {/* Persistent Bottom Tabs Navigation Bar */}
-      <BottomTabBar 
+      <BottomTabBar
         currentTab={currentTab}
         onTabChange={setCurrentTab}
-        showWatchlist={hasWatchlistMatches()}
-        showMemories={hasMemories() && !partnerUser}
+        showWatchlist={showWatchlistTab}
+        showMemories={hasMemories && !partnerUser}
         showDuo={!!partnerUser}
         billboardAlertCount={billboardAlerts.length}
       />

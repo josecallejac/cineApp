@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import MovieCard from './MovieCard';
 
-function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] }) {
+function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [], ratingsList = [], currentUser = null }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('score'); // 'score' | 'runtime' | 'alpha'
   const [selectedCinemaFilter, setSelectedCinemaFilter] = useState('all');
@@ -176,6 +176,8 @@ function BillboardTab({ movies, onMovieClick, isLoading, billboardAlerts = [] })
                 <MovieCard
                   movie={movie}
                   onClick={() => onMovieClick(movie)}
+                  ratingsList={ratingsList}
+                  currentUser={currentUser}
                 />
               </div>
             ))}

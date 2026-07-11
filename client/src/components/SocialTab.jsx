@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import RatingStars from './RatingStars';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, resolveAssetUrl } from '../config';
 
 export default function SocialTab({ ratingsList, movies, onMovieClick }) {
   const [likesState, setLikesState] = useState({}); // { reviewId: { count: number, liked: boolean } }
@@ -167,7 +167,7 @@ export default function SocialTab({ ratingsList, movies, onMovieClick }) {
               >
                 {/* Header: User details */}
                 <div className="feed-card-header">
-                  <img src={review.avatar} alt={review.author} className="feed-card-avatar" />
+                  <img src={review.avatar} alt={review.author} className="feed-card-avatar" loading="lazy" />
                   <div className="feed-user-info">
                     <div className="name-row">
                       <span className="feed-author-name">{review.author}</span>
@@ -235,7 +235,7 @@ export default function SocialTab({ ratingsList, movies, onMovieClick }) {
                     <div className="feed-photos-grid">
                       {review.photos.map((photo, pIdx) => (
                         <div key={pIdx} className="feed-photo-thumb">
-                          <img src={photo} alt={`Recuerdo ${pIdx + 1}`} />
+                          <img src={resolveAssetUrl(photo)} alt={`Recuerdo ${pIdx + 1}`} loading="lazy" />
                         </div>
                       ))}
                     </div>

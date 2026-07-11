@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import RatingStars from './RatingStars';
 import SurpriseEnvelope, { DATE_IDEAS } from './SurpriseEnvelope';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, resolveAssetUrl } from '../config';
 
 // Helper para extraer el ID de un video de YouTube
 const getYoutubeId = (url) => {
@@ -11,7 +11,7 @@ const getYoutubeId = (url) => {
   return (match && match[2].length === 11) ? match[2] : null;
 };
 
-export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddRating, ratingsList, onRefreshBillboard }) {
+export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddRating, ratingsList, onRefreshBillboard, partnerUser = null }) {
   const [activeTab, setActiveTab] = useState('info'); // 'info' | 'reviews'
   const [score, setScore] = useState(0);
   const [comment, setComment] = useState('');
@@ -195,34 +195,40 @@ export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddR
           userRatingCount = allRatings.filter(r => r.userId === activeProfile.id).length;
           setEnvelopeRatingCount(userRatingCount);
         }
-        // Mostrar sobre sorpresa solo si es una nueva valoración (no edición)
+        // Mostrar sobre sorpresa solo si: es nueva valoración (no edición) Y el usuario tiene pareja (Duo)
         if (!myExistingRating) {
-          try {
-            const ideaIdx = (userRatingCount - 1) % DATE_IDEAS.length;
-            const idea = DATE_IDEAS[ideaIdx] || DATE_IDEAS[0];
-            const envelopeResponse = await fetch(`${API_BASE_URL}/api/envelopes`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                userId: activeProfile.id,
-                ideaIndex: ideaIdx,
-                emoji: idea.emoji,
-                text: idea.idea,
-                tip: idea.tip,
-                movieTitle: movie.title,
-                movieKey: movie.key
-              })
-            });
-            if (!envelopeResponse.ok) {
-              const errBody = await envelopeResponse.json().catch(() => ({}));
-              throw new Error(errBody.error || `Error HTTP ${envelopeResponse.status}`);
+          if (partnerUser) {
+            // Solo guardamos y mostramos el sobre si tienen Duo activo
+            try {
+              const ideaIdx = (userRatingCount - 1) % DATE_IDEAS.length;
+              const idea = DATE_IDEAS[ideaIdx] || DATE_IDEAS[0];
+              const envelopeResponse = await fetch(`${API_BASE_URL}/api/envelopes`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  userId: activeProfile.id,
+                  ideaIndex: ideaIdx,
+                  emoji: idea.emoji,
+                  text: idea.idea,
+                  tip: idea.tip,
+                  movieTitle: movie.title,
+                  movieKey: movie.key
+                })
+              });
+              if (!envelopeResponse.ok) {
+                const errBody = await envelopeResponse.json().catch(() => ({}));
+                throw new Error(errBody.error || `Error HTTP ${envelopeResponse.status}`);
+              }
+            } catch (envelopeErr) {
+              console.error("Error al persistir sobre en la DB:", envelopeErr);
             }
-          } catch (envelopeErr) {
-            console.error("Error al persistir sobre en la DB:", envelopeErr);
+            setShowEnvelope(true);
+          } else {
+            // Sin pareja: no mostramos sobre, solo refrescamos
+            onRefreshBillboard();
           }
-          setShowEnvelope(true);
         } else {
           onRefreshBillboard();
         }
@@ -830,7 +836,7 @@ export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddR
                                 className="locked-photo-thumb"
                                 onClick={() => setSheetLightbox({ photos: myExistingRating.photos, index: pIdx })}
                               >
-                                <img src={photo} alt={`Recuerdo ${pIdx + 1}`} />
+                                <img src={resolveAssetUrl(photo)} alt={`Recuerdo ${pIdx + 1}`} loading="lazy" />
                               </div>
                             ))}
                           </div>
@@ -850,7 +856,9 @@ export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddR
                           className="visit-input"
                           value={watchedAt}
                           onChange={(e) => setWatchedAt(e.target.value)}
-                          max={today}
+                          min="2020-01-01"
+                          onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                          style={{ cursor: 'pointer' }}
                         />
                       </div>
                       <div className="visit-field">
@@ -974,7 +982,7 @@ export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddR
                             <div className="uploaded-previews-grid" style={{ marginTop: '8px' }}>
                               {photos.map((photo, pIdx) => (
                                 <div key={pIdx} className="uploaded-photo-preview">
-                                  <img src={photo} alt={`Subida ${pIdx + 1}`} />
+                                  <img src={resolveAssetUrl(photo)} alt={`Subida ${pIdx + 1}`} loading="lazy" />
                                   <button
                                     type="button"
                                     className="remove-photo-btn"
@@ -1009,7 +1017,7 @@ export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddR
                     {movieReviews.map(review => (
                       <div key={review.id} className="feed-item glass-card">
                         <div className="feed-user-row">
-                          <img src={review.avatar} alt={review.author} className="feed-avatar" />
+                          <img src={review.avatar} alt={review.author} className="feed-avatar" loading="lazy" />
                           <div className="feed-user-meta">
                             <span className="feed-username">{review.author}</span>
                             <span className="feed-date">
@@ -1169,7 +1177,7 @@ export default function MovieBottomSheet({ movie, onClose, activeProfile, onAddR
           )}
 
           <img 
-            src={sheetLightbox.photos[sheetLightbox.index]} 
+            src={resolveAssetUrl(sheetLightbox.photos[sheetLightbox.index])} 
             alt="Recuerdo en detalle" 
             className="sheet-lightbox-photo" 
             onClick={(e) => e.stopPropagation()}
