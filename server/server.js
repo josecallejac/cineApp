@@ -117,16 +117,168 @@ app.post('/api/auth/login', authRateLimit, (req, res) => {
 // Caché en memoria para almacenar los posters en alta resolución de TMDB
 const tmdbPosterCache = {};
 
-// Caché del scrape de Cinépolis compartido entre /api/billboard y /api/stats
-const CINEPOLIS_URL = "https://cinepolischile.cl/Cartelera.aspx/GetNowPlayingByCity";
-const CINEPOLIS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-const CINEPOLIS_CACHE_TTL_MS = 10 * 60 * 1000;
-let cinepolisCache = { cinemas: null, fetchedAt: 0, pending: null };
+// --- CARTELERA CINÉPOLIS (API GraphQL del sitio nuevo cinepolis.com/cl) ---
+// En 2026 cinepolischile.cl migró a cinepolis.com/cl; el viejo endpoint
+// Cartelera.aspx/GetNowPlayingByCity ya no existe. El sitio nuevo consume
+// GraphQL en api-g.cinepolis.com con una API key pública embebida en su JS.
+const http2 = require('http2');
 
-async function fetchCinepolisCinemas() {
+const CINEPOLIS_GRAPHQL_HOST = 'api-g.cinepolis.com';
+// Clave pública del sitio web de Cinépolis (no es un secreto; viaja en cada
+// request del navegador). Se puede sobreescribir por env si la rotan.
+const CINEPOLIS_API_KEY = process.env.CINEPOLIS_API_KEY || 'lQM6Mkvri1iHksKKCfpAiwGXq0YUZA7Nn6XAXRPr4i13LwXo';
+const CINEPOLIS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const CINEPOLIS_CITY_ID = 'santiago-oriente';
+const CINEPOLIS_STATIC_BASE = 'https://tickets-static-content.cinepolis.com';
+const CINEPOLIS_CACHE_TTL_MS = 10 * 60 * 1000;
+let cinepolisCache = { movies: null, fetchedAt: 0, pending: null };
+
+// IMPORTANTE: el WAF (Cloudflare) de api-g.cinepolis.com devuelve 403 en
+// /v2/billboards a clientes HTTP/1.1 que no sean navegadores (bloquea el
+// fetch nativo de Node, el módulo https clásico y curl), pero acepta HTTP/2.
+// Por eso este cliente usa node:http2. No migrar a fetch()/https.
+function cinepolisGraphql(pathName, payload) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const fail = (msg) => reject(new Error(`Cinépolis GraphQL ${payload.operationName}: ${msg}`));
+
+    const client = http2.connect(`https://${CINEPOLIS_GRAPHQL_HOST}`);
+    let settled = false;
+    const finish = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      client.close();
+      fn(arg);
+    };
+    const timer = setTimeout(() => {
+      client.destroy();
+      if (!settled) { settled = true; fail('timeout'); }
+    }, 20000);
+
+    client.on('error', (err) => finish(reject, err));
+
+    const req = client.request({
+      ':method': 'POST',
+      ':path': pathName,
+      'content-type': 'application/json',
+      'x-apikey': CINEPOLIS_API_KEY,
+      'country-id': 'CL',
+      'language': 'ES',
+      'accept': '*/*',
+      'user-agent': CINEPOLIS_USER_AGENT
+    });
+
+    let statusCode = 0;
+    let data = '';
+    req.setEncoding('utf8');
+    req.on('response', (headers) => { statusCode = headers[':status']; });
+    req.on('data', chunk => data += chunk);
+    req.on('end', () => {
+      if (statusCode !== 200) {
+        return finish(() => fail(`HTTP ${statusCode}`));
+      }
+      try {
+        const json = JSON.parse(data);
+        if (json.errors && json.errors.length) {
+          return finish(() => fail(json.errors[0].message));
+        }
+        finish(resolve, json.data);
+      } catch {
+        finish(() => fail('respuesta no es JSON'));
+      }
+    });
+    req.on('error', (err) => finish(reject, err));
+    req.end(body);
+  });
+}
+
+const CINEPOLIS_MOVIES_QUERY = `query Movies($countryId: String!, $category: String, $cinemas: String, $limit: Int) {
+  movies(countryId: $countryId, category: $category, cinemas: $cinemas, limit: $limit) {
+    edges {
+      node {
+        id
+        name
+        originalName
+        distributor
+        rating
+        ratingDescription
+        position
+        genre
+        synopsis
+        length
+        releaseDate
+        media { resource type code sizes { large medium small __typename } __typename }
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+}`;
+
+const CINEPOLIS_CITIES_QUERY = `query Cities($countryId: String!) {
+  cities(country_id: $countryId) {
+    edges { node { id name cinemas { id name cityId __typename } __typename } __typename }
+    __typename
+  }
+}`;
+
+const CINEPOLIS_BILLBOARD_QUERY = `query Billboard($countryId: String!, $cinemaId: String!, $timezone: String!, $isOffSelectorDays: Boolean!) {
+  billboardByCinema(countryId: $countryId, cinemaId: $cinemaId, timezone: $timezone, isOffSelectorDays: $isOffSelectorDays) {
+    dates
+    schedules {
+      cinemaId
+      cityId
+      movieId
+      dates {
+        date
+        languages {
+          language
+          displayLanguage
+          showtimes {
+            format { name __typename }
+            sessionId
+            datetime
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+}`;
+
+// "2026-07-12" → "12 jul" (formato que el cliente matchea en su calendario de 7 días)
+const CINEPOLIS_MONTHS_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function isoToShowtimeDate(isoDate) {
+  const [, month, day] = isoDate.split('-').map(Number);
+  return `${day} ${CINEPOLIS_MONTHS_SHORT[month - 1]}`;
+}
+
+// Resuelve la URL absoluta de un asset del CDN de Cinépolis (poster, tráiler mp4)
+function cinepolisMediaUrl(media, code) {
+  const item = (media || []).find(m => m.code === code);
+  if (!item || !item.sizes || !item.sizes.large) return null;
+  return `${CINEPOLIS_STATIC_BASE}${item.sizes.large}${item.resource}`;
+}
+
+// "AVENTURA" → "Aventura"
+function titleCaseGenre(genres) {
+  const g = (genres || [])[0];
+  if (!g) return null;
+  return g.charAt(0).toUpperCase() + g.slice(1).toLowerCase();
+}
+
+// Consolida metadata (Movies) + cines de Sector Oriente (Cities) + horarios por
+// cine (Billboard) en el shape que el cliente ya consume. Cacheado con TTL.
+async function fetchCinepolisMovies() {
   const now = Date.now();
-  if (cinepolisCache.cinemas && (now - cinepolisCache.fetchedAt) < CINEPOLIS_CACHE_TTL_MS) {
-    return cinepolisCache.cinemas;
+  if (cinepolisCache.movies && (now - cinepolisCache.fetchedAt) < CINEPOLIS_CACHE_TTL_MS) {
+    return cinepolisCache.movies;
   }
   // Deduplicar requests concurrentes mientras hay un scrape en vuelo
   if (cinepolisCache.pending) {
@@ -134,29 +286,132 @@ async function fetchCinepolisCinemas() {
   }
   cinepolisCache.pending = (async () => {
     try {
-      const response = await fetch(CINEPOLIS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "User-Agent": CINEPOLIS_USER_AGENT
-        },
-        body: JSON.stringify({ claveCiudad: "santiago-oriente", esVIP: false })
-      });
+      const [moviesData, citiesData] = await Promise.all([
+        cinepolisGraphql('/v2/billboards/graphql', {
+          operationName: 'Movies',
+          variables: { countryId: 'CL', category: 'now-playing', cinemas: '', limit: 100 },
+          query: CINEPOLIS_MOVIES_QUERY
+        }),
+        cinepolisGraphql('/shared-services/locations/graphql', {
+          operationName: 'Cities',
+          variables: { countryId: 'CL' },
+          query: CINEPOLIS_CITIES_QUERY
+        })
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`Error en la API de Cinépolis: ${response.statusText}`);
+      const city = (citiesData.cities.edges || []).map(e => e.node).find(n => n.id === CINEPOLIS_CITY_ID);
+      if (!city || !city.cinemas || city.cinemas.length === 0) {
+        throw new Error(`Ciudad "${CINEPOLIS_CITY_ID}" sin cines en la respuesta de Cinépolis`);
       }
 
-      const rawData = await response.json();
-      const cinemas = rawData.d?.Cinemas || [];
-      cinepolisCache.cinemas = cinemas;
+      // Metadata indexada por slug de película
+      const metaById = {};
+      for (const edge of (moviesData.movies.edges || [])) {
+        metaById[edge.node.id] = edge.node;
+      }
+
+      // Horarios de cada cine de la zona, en paralelo; un cine caído no bota la cartelera
+      const billboards = await Promise.allSettled(city.cinemas.map(cinema =>
+        cinepolisGraphql('/v2/billboards/graphql', {
+          operationName: 'Billboard',
+          variables: { countryId: 'CL', cinemaId: cinema.id, timezone: 'America/Santiago', isOffSelectorDays: true },
+          query: CINEPOLIS_BILLBOARD_QUERY
+        })
+      ));
+
+      const uniqueMovies = {};
+      billboards.forEach((result, idx) => {
+        const cinema = city.cinemas[idx];
+        if (result.status !== 'fulfilled') {
+          console.error(`[Cinépolis] Horarios de ${cinema.name} fallaron:`, result.reason.message);
+          return;
+        }
+        const cinemaName = `Cinépolis ${cinema.name}`;
+
+        for (const schedule of (result.value.billboardByCinema.schedules || [])) {
+          const mKey = schedule.movieId;
+          if (!uniqueMovies[mKey]) {
+            const meta = metaById[mKey];
+            uniqueMovies[mKey] = {
+              id: mKey,
+              key: mKey,
+              title: meta ? meta.name : mKey.replace(/-/g, ' '),
+              originalTitle: meta ? meta.originalName : null,
+              rating: meta ? meta.rating : null,
+              // El cliente muestra ratingDescription como sinopsis
+              ratingDescription: meta ? (meta.synopsis || meta.ratingDescription) : null,
+              runTime: meta ? meta.length : null,
+              poster: meta ? cinepolisMediaUrl(meta.media, 'poster') : null,
+              trailer: meta ? cinepolisMediaUrl(meta.media, 'trailer_mp4') : null,
+              director: "Desconocido", // el API nuevo ya no expone director ni elenco
+              gender: (meta && titleCaseGenre(meta.genre)) || "Cine",
+              distributor: meta ? meta.distributor : null,
+              actors: [],
+              position: meta ? Number(meta.position) || 999 : 999,
+              showtimes: []
+            };
+          }
+
+          // Agrupar horarios por complejo y fecha (mismo shape que el API viejo)
+          let cinemaEntry = uniqueMovies[mKey].showtimes.find(c => c.cinemaName === cinemaName);
+          if (!cinemaEntry) {
+            cinemaEntry = { cinemaName, dates: [] };
+            uniqueMovies[mKey].showtimes.push(cinemaEntry);
+          }
+
+          for (const scheduleDate of (schedule.dates || [])) {
+            const showtimeDate = isoToShowtimeDate(scheduleDate.date);
+            let dateEntry = cinemaEntry.dates.find(d => d.showtimeDate === showtimeDate);
+            if (!dateEntry) {
+              dateEntry = { showtimeDate, formats: [] };
+              cinemaEntry.dates.push(dateEntry);
+            }
+
+            for (const language of (scheduleDate.languages || [])) {
+              for (const st of (language.showtimes || [])) {
+                const formatName = `${language.language || ''} ${(st.format && st.format.name) || '2D'}`.trim();
+                let formatEntry = dateEntry.formats.find(f => f.formatName === formatName);
+                if (!formatEntry) {
+                  formatEntry = { formatName, times: [] };
+                  dateEntry.formats.push(formatEntry);
+                }
+                if (!formatEntry.times.some(t => t.id === st.sessionId)) {
+                  formatEntry.times.push({
+                    time: st.datetime.slice(11, 16),
+                    id: st.sessionId
+                  });
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Si todos los cines fallaron no hay cartelera real: tratarlo como error
+      if (Object.keys(uniqueMovies).length === 0 && billboards.every(b => b.status !== 'fulfilled')) {
+        throw new Error('Ningún cine de Sector Oriente respondió horarios');
+      }
+
+      // Ordenar horas dentro de cada formato y las películas por su posición en el sitio
+      for (const movie of Object.values(uniqueMovies)) {
+        for (const cinemaEntry of movie.showtimes) {
+          for (const dateEntry of cinemaEntry.dates) {
+            for (const formatEntry of dateEntry.formats) {
+              formatEntry.times.sort((a, b) => a.time.localeCompare(b.time));
+            }
+          }
+        }
+      }
+      const movies = Object.values(uniqueMovies).sort((a, b) => a.position - b.position);
+
+      cinepolisCache.movies = movies;
       cinepolisCache.fetchedAt = Date.now();
-      return cinemas;
+      return movies;
     } catch (err) {
       // Si el scrape falla pero tenemos datos viejos, servirlos como fallback
-      if (cinepolisCache.cinemas) {
+      if (cinepolisCache.movies) {
         console.error("[Cinépolis] Scrape falló, sirviendo caché expirado:", err.message);
-        return cinepolisCache.cinemas;
+        return cinepolisCache.movies;
       }
       throw err;
     } finally {
@@ -169,95 +424,18 @@ async function fetchCinepolisCinemas() {
 // Endpoint para obtener la cartelera consolidada y calificada de Sector Oriente
 app.get('/api/billboard', async (req, res) => {
   try {
-    // 1. Fetch live data from Cinepolis Chile (con caché TTL)
-    const cinemas = await fetchCinepolisCinemas();
+    // 1. Cartelera consolidada de Cinépolis (con caché TTL compartido)
+    const movies = await fetchCinepolisMovies();
 
-    // 2. Consolidar películas únicas de Sector Oriente
-    const uniqueMovies = {};
-
-    cinemas.forEach(cinema => {
-      cinema.Dates.forEach(date => {
-        const moviesInDate = date.Movies || [];
-
-        moviesInDate.forEach(movie => {
-          const mKey = movie.Key;
-
-          if (!uniqueMovies[mKey]) {
-            // Mapear con puntuaciones de la base de datos local
-            const ratingSummary = database.getMovieRatingSummary(mKey);
-
-            let posterUrl = movie.Poster.startsWith("http") ? movie.Poster : `https://static.cinepolis.com${movie.Poster}`;
-            
-            // Forzar HTTPS para evitar problemas de Mixed Content en iOS y navegadores móviles
-            if (posterUrl.startsWith("http://")) {
-              posterUrl = posterUrl.replace("http://", "https://");
-            }
-
-            uniqueMovies[mKey] = {
-              id: movie.Id,
-              title: movie.Title,
-              key: movie.Key,
-              originalTitle: movie.OriginalTitle,
-              rating: movie.Rating,
-              ratingDescription: movie.RatingDescription,
-              runTime: movie.RunTime,
-              poster: posterUrl,
-              trailer: movie.Trailer,
-              director: movie.Director || "Desconocido",
-              gender: movie.Gender || "Cine",
-              distributor: movie.Distributor,
-              actors: movie.Actors || [],
-              ratingSummary,
-              showtimes: []
-            };
-          }
-
-          // Agrupar horarios por complejo y fecha
-          let cinemaEntry = uniqueMovies[mKey].showtimes.find(c => c.cinemaName === cinema.Name);
-          if (!cinemaEntry) {
-            cinemaEntry = {
-              cinemaName: cinema.Name,
-              dates: []
-            };
-            uniqueMovies[mKey].showtimes.push(cinemaEntry);
-          }
-
-          let dateEntry = cinemaEntry.dates.find(d => d.showtimeDate === date.ShowtimeDate);
-          if (!dateEntry) {
-            dateEntry = {
-              showtimeDate: date.ShowtimeDate,
-              formats: []
-            };
-            cinemaEntry.dates.push(dateEntry);
-          }
-
-          (movie.Formats || []).forEach(format => {
-            let formatEntry = dateEntry.formats.find(f => f.formatName === format.Name);
-            if (!formatEntry) {
-              formatEntry = {
-                formatName: format.Name,
-                times: []
-              };
-              dateEntry.formats.push(formatEntry);
-            }
-
-            (format.Showtimes || []).forEach(st => {
-              if (!formatEntry.times.some(t => t.id === st.ShowtimeId)) {
-                formatEntry.times.push({
-                  time: st.Time,
-                  id: st.ShowtimeId
-                });
-              }
-            });
-          });
-        });
-      });
+    // 2. Adjuntar el resumen de puntuaciones locales (siempre fresco, fuera del caché)
+    movies.forEach(movie => {
+      movie.ratingSummary = database.getMovieRatingSummary(movie.key);
     });
 
     // ⚡ RESOLVEDOR DE POSTERS HD (TMDB) — en paralelo; solo consulta películas sin caché
     const tmdbApiKey = process.env.TMDB_API_KEY;
     if (tmdbApiKey) {
-      const uncached = Object.values(uniqueMovies).filter(movie => {
+      const uncached = movies.filter(movie => {
         if (tmdbPosterCache[movie.key]) {
           movie.poster = tmdbPosterCache[movie.key];
           return false;
@@ -284,11 +462,7 @@ app.get('/api/billboard', async (req, res) => {
       }
     }
 
-    const moviesArray = Object.values(uniqueMovies);
-
-    res.json({
-      movies: moviesArray
-    });
+    res.json({ movies });
 
   } catch (error) {
     console.error("Error fetching billboard:", error);
@@ -347,16 +521,10 @@ app.get('/api/ratings', (req, res) => {
 app.get('/api/stats', async (req, res) => {
   try {
     // Necesitamos la cartelera para cruzar datos (caché compartido con /api/billboard)
-    const moviesCount = new Set();
+    let totalBillboardMovies = 0;
     try {
-      const cinemas = await fetchCinepolisCinemas();
-      cinemas.forEach(cinema => {
-        cinema.Dates.forEach(date => {
-          (date.Movies || []).forEach(movie => {
-            moviesCount.add(movie.Key);
-          });
-        });
-      });
+      const movies = await fetchCinepolisMovies();
+      totalBillboardMovies = movies.length;
     } catch (err) {
       console.error("[Stats] No se pudo obtener la cartelera:", err.message);
     }
@@ -407,7 +575,7 @@ app.get('/api/stats', async (req, res) => {
       averageRating,
       globalStars,
       bestMovie,
-      totalMovies: moviesCount.size
+      totalMovies: totalBillboardMovies
     });
 
   } catch (error) {
@@ -607,8 +775,8 @@ app.post('/api/users/unlink', (req, res) => {
 });
 
 // Proxy de imágenes para evitar CORS en el canvas de invitaciones con optimización de caché local en disco
-const https = require('https');
 const http = require('http');
+const https = require('https');
 const crypto = require('crypto');
 const fsSync = require('fs');
 const pathSync = require('path');
@@ -621,6 +789,7 @@ if (!fsSync.existsSync(cacheDir)) {
 // Solo se permite proxear imágenes de los orígenes que usa la app (posters y avatares)
 const PROXY_ALLOWED_HOSTS = [
   'static.cinepolis.com',
+  'tickets-static-content.cinepolis.com',
   'cinepolischile.cl',
   'www.cinepolischile.cl',
   'image.tmdb.org',
