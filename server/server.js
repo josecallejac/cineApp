@@ -114,8 +114,10 @@ app.post('/api/auth/login', authRateLimit, (req, res) => {
   }
 });
 
-// Caché en memoria para almacenar los posters en alta resolución de TMDB
-const tmdbPosterCache = {};
+// Caché en memoria de metadata enriquecida de TMDB (poster HD, director y elenco).
+// La API nueva de Cinépolis ya no expone director ni actores, así que TMDB es la
+// única fuente de esos campos. Se cachea por movie.key: { poster, director, actors }.
+const tmdbMetaCache = {};
 
 // --- CARTELERA CINÉPOLIS (API GraphQL del sitio nuevo cinepolis.com/cl) ---
 // En 2026 cinepolischile.cl migró a cinepolis.com/cl; el viejo endpoint
@@ -432,31 +434,55 @@ app.get('/api/billboard', async (req, res) => {
       movie.ratingSummary = database.getMovieRatingSummary(movie.key);
     });
 
-    // ⚡ RESOLVEDOR DE POSTERS HD (TMDB) — en paralelo; solo consulta películas sin caché
+    // ⚡ ENRIQUECIMIENTO TMDB (poster HD + director + elenco) — en paralelo; solo
+    // consulta películas sin caché. Cinépolis ya no expone director/actores.
     const tmdbApiKey = process.env.TMDB_API_KEY;
     if (tmdbApiKey) {
+      const applyMeta = (movie, meta) => {
+        if (meta.poster) movie.poster = meta.poster;
+        if (meta.director) movie.director = meta.director;
+        if (meta.actors && meta.actors.length) movie.actors = meta.actors;
+      };
+
       const uncached = movies.filter(movie => {
-        if (tmdbPosterCache[movie.key]) {
-          movie.poster = tmdbPosterCache[movie.key];
+        if (tmdbMetaCache[movie.key]) {
+          applyMeta(movie, tmdbMetaCache[movie.key]);
           return false;
         }
         return true;
       });
 
       if (uncached.length > 0) {
-        console.log(`[TMDB] Resolviendo posters HD en paralelo para ${uncached.length} películas...`);
+        console.log(`[TMDB] Enriqueciendo ${uncached.length} películas (poster/director/elenco)...`);
         await Promise.all(uncached.map(async (movie) => {
           try {
-            const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(movie.title)}&language=es-CL`);
-            const data = await res.json();
-            const match = (data.results || []).find(r => r.poster_path);
-            if (match) {
-              const hdPoster = `https://image.tmdb.org/t/p/w500${match.poster_path}`;
-              tmdbPosterCache[movie.key] = hdPoster;
-              movie.poster = hdPoster;
+            // Buscar la película por título original (más estable) o título local
+            const query = movie.originalTitle || movie.title;
+            const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbApiKey}&query=${encodeURIComponent(query)}&language=es-CL`);
+            const searchData = await searchRes.json();
+            const match = (searchData.results || []).find(r => r.poster_path) || (searchData.results || [])[0];
+            if (!match) return;
+
+            const meta = {};
+            if (match.poster_path) {
+              meta.poster = `https://image.tmdb.org/t/p/w500${match.poster_path}`;
             }
+
+            // Traer créditos (director + elenco principal) en una segunda llamada
+            try {
+              const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${match.id}/credits?api_key=${tmdbApiKey}&language=es-CL`);
+              const credits = await creditsRes.json();
+              const director = (credits.crew || []).find(c => c.job === 'Director');
+              if (director) meta.director = director.name;
+              meta.actors = (credits.cast || []).slice(0, 5).map(c => c.name);
+            } catch (creditErr) {
+              console.error(`[TMDB] Error al buscar créditos de ${query}:`, creditErr.message);
+            }
+
+            tmdbMetaCache[movie.key] = meta;
+            applyMeta(movie, meta);
           } catch (err) {
-            console.error(`[TMDB] Error al buscar poster de ${movie.title}:`, err.message);
+            console.error(`[TMDB] Error al enriquecer ${movie.title}:`, err.message);
           }
         }));
       }
